@@ -13,7 +13,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
- 
+
 const char html_init_setup[] PROGMEM = ""
         "<div style='text-align:center;'>"
             "<h2>_TXT_INIT_TITLE_</h2>"
@@ -41,6 +41,29 @@ const char html_init_setup[] PROGMEM = ""
                     "<br/>"
                     "<input type='password' id='psk' name='psk' placeholder=' '>"
                 "</p>"
+                "<details>"
+                "<summary>Network static IP config</summary>"
+                    "<p><b>_TXT_WIFI_STATIC_IP_</b>"
+                        "<br/>"
+                        "<input type='text' id='stip' name='stip' placeholder=' ' value='_WIFI_STATIC_IP_' "
+                        "autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
+                    "</p>"
+                    "<p><b>_TXT_WIFI_STATIC_GW_</b>"
+                        "<br/>"
+                        "<input type='text' id='stgw' name='stgw' placeholder=' ' value='_WIFI_STATIC_GW_' "
+                        "autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
+                    "</p>"
+                    "<p><b>_TXT_WIFI_STATIC_MASK_</b>"
+                        "<br/>"
+                        "<input type='text' id='stmask' name='stmask' placeholder='255.255.255.0' value='_WIFI_STATIC_MASK_' "
+                        "autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
+                    "</p>"
+                    "<p><b>_TXT_WIFI_STATIC_DNS_</b>"
+                        "<br/>"
+                        "<input type='text' id='stdns' name='stdns' placeholder=' ' value='_WIFI_STATIC_DNS_' "
+                        "autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
+                    "</p>"
+                "</details>"
                 "</fieldset>"
                 "<fieldset>"
                 "<legend><b>&nbsp; _TXT_MQTT_TITLE_ &nbsp;</b><br/></legend>"
@@ -71,12 +94,12 @@ const char html_init_setup[] PROGMEM = ""
             "</form>"
             "</div>";
 
-const char html_init_save[] PROGMEM = 
+const char html_init_save[] PROGMEM =
         "<p>_TXT_INIT_REBOOT_MES_"
         " <b>_CONFIG_ADDR_</b>"
         "<br>"
         "_TXT_INIT_REBOOT_MES_1_"
         " <span id='count'>10s</span>...</p>";
 
-const char html_init_reboot[] PROGMEM = 
+const char html_init_reboot[] PROGMEM =
         "<p>_TXT_INIT_REBOOT_</p>";
