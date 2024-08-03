@@ -1648,7 +1648,7 @@ void handleMetrics(AsyncWebServerRequest *request)
   heatpumpSettings currentSettings = hp.getSettings();
   heatpumpStatus currentStatus = hp.getStatus();
 
-  String hppower = currentSettings.power == "ON" ? "1" : "0";
+  String hppower = strcmp(currentSettings.power, "ON") == 0 ? "1" : "0";
 
   String hpfan = currentSettings.fan;
   if (hpfan == "AUTO")
@@ -1663,31 +1663,31 @@ void handleMetrics(AsyncWebServerRequest *request)
     hpvane = "0";
 
   String hpwidevane = "-2";
-  if (currentSettings.wideVane == "SWING")
+  if (strcmp(currentSettings.wideVane, "SWING") == 0)
     hpwidevane = "0";
-  if (currentSettings.wideVane == "<<")
+  if (strcmp(currentSettings.wideVane, "<<") == 0)
     hpwidevane = "1";
-  if (currentSettings.wideVane == "<")
+  if (strcmp(currentSettings.wideVane, "<") == 0)
     hpwidevane = "2";
-  if (currentSettings.wideVane == "|")
+  if (strcmp(currentSettings.wideVane, "|") == 0)
     hpwidevane = "3";
-  if (currentSettings.wideVane == ">")
+  if (strcmp(currentSettings.wideVane, ">") == 0)
     hpwidevane = "4";
-  if (currentSettings.wideVane == ">>")
+  if (strcmp(currentSettings.wideVane, ">>") == 0)
     hpwidevane = "5";
-  if (currentSettings.wideVane == "<>")
+  if (strcmp(currentSettings.wideVane, "<>") == 0)
     hpwidevane = "6";
 
   String hpmode = "-2";
-  if (currentSettings.mode == "AUTO")
+  if (strcmp(currentSettings.mode, "AUTO") == 0)
     hpmode = "-1";
-  if (currentSettings.mode == "COOL")
+  if (strcmp(currentSettings.mode, "COOL") == 0)
     hpmode = "1";
-  if (currentSettings.mode == "DRY")
+  if (strcmp(currentSettings.mode, "DRY") == 0)
     hpmode = "2";
-  if (currentSettings.mode == "HEAT")
+  if (strcmp(currentSettings.mode, "HEAT") == 0)
     hpmode = "3";
-  if (currentSettings.mode == "FAN")
+  if (strcmp(currentSettings.mode, "FAN") == 0)
     hpmode = "4";
   if (hppower == "0")
     hpmode = "0";
@@ -2533,7 +2533,9 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
   }
   else
   {
-    mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, strcat((char *)"heatpump: wrong mqtt topic: ", topic));
+    String msg("heatpump: wrong mqtt topic: ");
+    msg += topic;
+    mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, msg.c_str());
   }
 
   if (update)

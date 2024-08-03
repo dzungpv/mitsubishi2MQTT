@@ -76,7 +76,6 @@ char buffer[200]; // buffer for reading the string to (needs to be large enough 
 const char *translatedWord(const char *const *strings, const bool force_en)
 {
   uint8_t language_index = system_language_index; // default 0 for English
-  uint8_t index = 0;
 
   if (!strings)
   {
@@ -84,6 +83,7 @@ const char *translatedWord(const char *const *strings, const bool force_en)
   }
 #ifdef ESP32
   // see how many translations we have for this entity. if there is no translation for this, revert to EN
+  // uint8_t index = 0;
   // if (!force_en && (countItems(strings) >= language_index + 1 && strlen(strings[language_index])))
   // {
   //   index = language_index;
