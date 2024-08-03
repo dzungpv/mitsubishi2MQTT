@@ -97,7 +97,8 @@ namespace en
   const char txt_others_rx_pin[] PROGMEM = "RX pin (ESP32, 0 use UART1)";
   const char txt_others_tz[] PROGMEM = "Timezone";
   const char txt_others_tz_list[] PROGMEM = "See list";
-  
+  const char txt_others_ntp_server[] PROGMEM = "NTP Server";
+
   // Page Status
   const char txt_status_title[] PROGMEM = "Status";
   const char txt_status_hvac[] PROGMEM = "HVAC Status";

@@ -13,8 +13,8 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
- 
-const char html_page_reboot[] PROGMEM = 
+
+const char html_page_reboot[] PROGMEM =
         "<p>_TXT_M_REBOOT_ <span id='count'>20s</span>...</p>"
         "<script>"
             "setTimeout(function() {"
@@ -22,12 +22,12 @@ const char html_page_reboot[] PROGMEM =
             "}, 20000);"
         "</script>";
 
-const char html_page_reset[] PROGMEM = 
+const char html_page_reset[] PROGMEM =
         "<p>_TXT_M_RESET_ <span id='count'>20s</span>. _TXT_M_RESET_1_ _UNIT_NAME_</p>"
 ;
 
 
-const char html_page_save_reboot[] PROGMEM = 
+const char html_page_save_reboot[] PROGMEM =
         "<p>_TXT_M_SAVE_ <span id='count'>20s</span>...</p>"
         "<script>"
             "setTimeout(function() {"
@@ -36,7 +36,7 @@ const char html_page_save_reboot[] PROGMEM =
         "</script>"
 ;
 
-const char html_page_mqtt[] PROGMEM = 
+const char html_page_mqtt[] PROGMEM =
         "<div id='l1' name='l1'>"
             "<fieldset>"
                "<legend><b>&nbsp; _TXT_MQTT_TITLE_ &nbsp;</b></legend>"
@@ -90,7 +90,7 @@ const char html_page_mqtt[] PROGMEM =
         "</div>"
 ;
 
-const char html_page_others[] PROGMEM = 
+const char html_page_others[] PROGMEM =
         "<div id='l1' name='l1'>"
             "<fieldset>"
                 "<legend><b>&nbsp; _TXT_OTHERS_TITLE_ &nbsp;</b></legend>"
@@ -131,6 +131,11 @@ const char html_page_others[] PROGMEM =
                         "<input id='tz' name='tz' placeholder=' ' value='_TIME_ZONE_' "
 						"autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
                     "</p>"
+                    "<p><b>_TXT_OTHER_NTP_SERVER_</b>"
+                        "<br/>"
+                        "<input id='ntp' name='ntp' placeholder='pool.ntp.org' value='_NTP_SERVER_' "
+						"autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
+                    "</p>"
                     "<br/>"
                     "<button name='save' type='submit' class='button bgrn'>_TXT_SAVE_</button>"
                 "</form>"
@@ -143,7 +148,7 @@ const char html_page_others[] PROGMEM =
         "</div>"
 ;
 
-const char html_page_status[] PROGMEM = 
+const char html_page_status[] PROGMEM =
         "<div id='l1' name='l1'>"
             "<fieldset>"
             "<legend><b>&nbsp; _TXT_STATUS_TITLE_ &nbsp;</b></legend>"
@@ -168,7 +173,7 @@ const char html_page_status[] PROGMEM =
             "</p>"
         "</div>";
 
-const char html_page_wifi[] PROGMEM = 
+const char html_page_wifi[] PROGMEM =
         "<div id='l1' name='l1'>"
             "<fieldset>"
                 "<legend><b>&nbsp; _TXT_WIFI_TITLE_ &nbsp;</b></legend>"
@@ -211,7 +216,7 @@ const char html_page_wifi[] PROGMEM =
         "</div>"
 ;
 
-const char html_page_control[] PROGMEM = 
+const char html_page_control[] PROGMEM =
 
         "<div style='text-align:center;'>"
             "<h2>_TXT_CTRL_CTEMP_ <span id='room_temperature'>_ROOMTEMP_</span>&#176;</h2>"
@@ -307,7 +312,7 @@ const char html_page_control[] PROGMEM =
             "</p>"
         "</div>";
 
-const char html_page_unit[] PROGMEM = 
+const char html_page_unit[] PROGMEM =
         "<div id='l1' name='l1'>"
             "<fieldset>"
                 "<legend><b>&nbsp; _TXT_UNIT_TITLE_ &nbsp;</b></legend>"
@@ -355,7 +360,7 @@ const char html_page_unit[] PROGMEM =
                         "<input id='lpwc' name='lpwc' type='password' placeholder=' ' value='_LOGIN_PASSWORD_' "
 						"autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'>"
                     "</p>"
-                    "<span id='message_not_match' style='color:red'> </span> <br>" 
+                    "<span id='message_not_match' style='color:red'> </span> <br>"
                     "<p>_TXT_UNIT_LOGIN_USERNAME_ <b>admin</b></p>"
                     "<br/>"
                     "<button name='save' type='submit' class='button bgrn'>_TXT_SAVE_</button>"
@@ -370,7 +375,7 @@ const char html_page_unit[] PROGMEM =
         "</div>"
 ;
 
-const char html_page_login[] PROGMEM = 
+const char html_page_login[] PROGMEM =
     "<script>"
         "var loginSucess = _LOGIN_SUCCESS_;"
         "document.onreadystatechange = function() {"
@@ -406,7 +411,7 @@ const char html_page_login[] PROGMEM =
         "</div>"
 ;
 
-const char html_page_upgrade[] PROGMEM = 
+const char html_page_upgrade[] PROGMEM =
     "<script>"
         "function eb(s) {"
             "return document.getElementById(s);"
@@ -438,7 +443,7 @@ const char html_page_upgrade[] PROGMEM =
         "<div id='f2' style='display:none;text-align:center;'><b>_TXT_UPGRADE_START_ ...</b></div>"
 ;
 
-const char html_page_upload[] PROGMEM = 
+const char html_page_upload[] PROGMEM =
         "<div style='text-align:center;'>"
             "<h2>_TXT_UPLOAD_FW_PAGE_</h2>"
         "</div>"

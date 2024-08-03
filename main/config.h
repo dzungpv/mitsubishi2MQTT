@@ -194,7 +194,7 @@ String ap_pwd;
 String ota_pwd;
 
 // time and time zone
-const char *ntpServer = "pool.ntp.org";
+String ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 
