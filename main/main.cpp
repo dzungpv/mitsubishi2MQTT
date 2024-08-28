@@ -2964,7 +2964,7 @@ bool connectWifi()
   if (!ok || !static_valid) {
     // fallback to DHCP
 #ifdef ESP32
-    WiFi.config(static_cast<IPAddress>(0), static_cast<IPAddress>(0), static_cast<IPAddress>(0));
+    WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
 #else
     WiFi.config(0, 0, 0);
 #endif
