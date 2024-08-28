@@ -3,3 +3,4 @@
 .pio*
 *.bin
 build/
+data/

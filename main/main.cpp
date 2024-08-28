@@ -136,18 +136,18 @@ void setup()
   initNVS();
 #endif
   ESP_LOGD(TAG, "Starting  %s", appName);
-  // Mount SPIFFS filesystem
-  if (SPIFFS.begin())
+  // Mount LittleFS filesystem
+  if (LittleFS.begin())
   {
     ESP_LOGD(TAG, "Mounted file system");
   }
   else
   {
-    ESP_LOGD(TAG, "Failed to mount FS -> formating");
-    SPIFFS.format();
-    if (SPIFFS.begin())
+    ESP_LOGD(TAG, "Failed to mount FS -> formatting");
+    LittleFS.format();
+    if (LittleFS.begin())
     {
-      ESP_LOGD(TAG, "Mounted file system after formating");
+      ESP_LOGD(TAG, "Mounted file system after formatting");
     }
   }
   // set led pin as output
@@ -210,9 +210,9 @@ void setup()
   }
   if (initWifi())
   {
-    if (SPIFFS.exists(console_file))
+    if (LittleFS.exists(console_file))
     {
-      SPIFFS.remove(console_file);
+      LittleFS.remove(console_file);
     }
     // write_log("Starting Mitsubishi2MQTT");
     MDNS.begin(hostname); // DNS service for .local address access
@@ -316,12 +316,12 @@ bool loadWifi()
 {
   ap_ssid = "";
   ap_pwd = "";
-  if (!SPIFFS.exists(wifi_conf))
+  if (!LittleFS.exists(wifi_conf))
   {
     ESP_LOGE(TAG, "Wifi config file not exist!");
     return false;
   }
-  File configFile = SPIFFS.open(wifi_conf, "r");
+  File configFile = LittleFS.open(wifi_conf, "r");
   if (!configFile)
   {
     ESP_LOGE(TAG, "Failed to open wifi config file");
@@ -375,13 +375,13 @@ bool loadWifi()
 
 bool loadMqtt()
 {
-  if (!SPIFFS.exists(mqtt_conf))
+  if (!LittleFS.exists(mqtt_conf))
   {
     ESP_LOGE(TAG, "MQTT config file not exist!");
     return false;
   }
   // write_log("Loading MQTT configuration");
-  File configFile = SPIFFS.open(mqtt_conf, "r");
+  File configFile = LittleFS.open(mqtt_conf, "r");
   if (!configFile)
   {
     ESP_LOGE(TAG, "Failed to open MQTT config file");
@@ -471,12 +471,12 @@ bool loadMqtt()
 
 bool loadUnit()
 {
-  if (!SPIFFS.exists(unit_conf))
+  if (!LittleFS.exists(unit_conf))
   {
     // Serial.println(F("Unit config file not exist!"));
     return false;
   }
-  File configFile = SPIFFS.open(unit_conf, "r");
+  File configFile = LittleFS.open(unit_conf, "r");
   if (!configFile)
   {
     return false;
@@ -526,12 +526,12 @@ bool loadUnit()
 
 bool loadOthers()
 {
-  if (!SPIFFS.exists(others_conf))
+  if (!LittleFS.exists(others_conf))
   {
     // Serial.println(F("Others config file not exist!"));
     return false;
   }
-  File configFile = SPIFFS.open(others_conf, "r");
+  File configFile = LittleFS.open(others_conf, "r");
   if (!configFile)
   {
     return false;
@@ -617,7 +617,7 @@ void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const Stri
   {
     doc["mqtt_root_ca_cert"] = mqttRootCaCert;
   }
-  File configFile = SPIFFS.open(mqtt_conf, "w");
+  File configFile = LittleFS.open(mqtt_conf, "w");
   if (!configFile)
   {
     ESP_LOGD(TAG, "Failed to open config file for writing");
@@ -655,7 +655,7 @@ void saveUnit(String tempUnit, String supportMode, String supportFanMode, String
   if (languageIndex.isEmpty())
     languageIndex = "0";
   doc["language_index"] = languageIndex;
-  File configFile = SPIFFS.open(unit_conf, "w");
+  File configFile = LittleFS.open(unit_conf, "w");
   if (!configFile)
   {
     // Serial.println(F("Failed to open config file for writing"));
@@ -677,7 +677,7 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   doc["ap_pwd"] = apPwd;
   doc["hostname"] = hostName;
   doc["ota_pwd"] = otaPwd;
-  File configFile = SPIFFS.open(wifi_conf, "w");
+  File configFile = LittleFS.open(wifi_conf, "w");
   if (!configFile)
   {
     ESP_LOGD(TAG, "Failed to open wifi file for writing");
@@ -698,7 +698,7 @@ void saveOthers(const String& haa, const String& haat, const String& debugPckts,
   doc["txPin"] = txPin;
   doc["rxPin"] = rxPin;
   doc["tz"] = tz;
-  File configFile = SPIFFS.open(others_conf, "w");
+  File configFile = LittleFS.open(others_conf, "w");
   if (!configFile)
   {
     ESP_LOGD(TAG, "Failed to open other config file for writing");
@@ -1925,12 +1925,21 @@ void handleUploadLoop(AsyncWebServerRequest *request, const String& filename, si
       mqtt_reconnect_timeout = millis() + MQTT_RECONNECT_INTERVAL_MS;
     }
     ota_content_len = request->contentLength();
-    // if filename includes spiffs, update the spiffs partition
-    int cmd = (filename.indexOf("spiffs") > -1) ? U_PART : U_FLASH;
+    // if filename includes littlefs, update the littlefs partition
+    bool isFs = filename.indexOf("littlefs") > -1;
+    int cmd = isFs ? U_FS : U_FLASH;
     // uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000; // 0x1000 start boot loader
 #ifdef ESP8266
+    size_t update_size = ota_content_len;
+    if (isFs)
+    {
+      update_size = (size_t)(FS_end - FS_start);
+      // https://arduino-esp8266.readthedocs.io/en/latest/filesystem.html#flash-layout
+      // > Use this method before updating the file system using OTA.
+      LittleFS.end();
+    }
     Update.runAsync(true);
-    if (!Update.begin(ota_content_len, cmd))
+    if (!Update.begin(update_size, cmd))
     {
 #else
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd))
@@ -1980,7 +1989,7 @@ void handleUploadLoop(AsyncWebServerRequest *request, const String& filename, si
 
 void write_log(const String& log)
 {
-  File logFile = SPIFFS.open(console_file, "a");
+  File logFile = LittleFS.open(console_file, "a");
   logFile.println(log);
   logFile.close();
 }
@@ -3576,7 +3585,7 @@ String getValueBySeparator(const String& data, char separator, int index)
 
 void factoryReset()
 {
-  SPIFFS.format();
+  LittleFS.format();
 #ifdef ESP32
   // delete nvs partition because AP mode not working if have other data
   esp_err_t err = nvs_flash_erase();
