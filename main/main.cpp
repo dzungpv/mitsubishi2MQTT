@@ -2597,7 +2597,7 @@ void haConfigFreq(String tag, String unit, String icon) {
 
   haConfig["icon"] = icon;
   haConfig["name"] = tag;
-  haConfig["unique_id"] = String("hvac_") + getId() + "_" + tag;
+  haConfig["unique_id"] = getId() + "_" + tag;
 
   haConfig["dev_cla"] = "frequency";
   haConfig["stat_t"] = ha_state_topic;
@@ -2631,7 +2631,7 @@ void haConfigSensor(String tag, String unit, String icon)
   tag.replace(" ", "_");
   tag.toLowerCase();
   //
-  haConfig["unique_id"] = String("hvac_") + getId() + "_" + tag;
+  haConfig["unique_id"] = getId() + "_" + tag;
   if (strcmp(tag.c_str(), "connection_state") == 0)
   {
     haConfig["dev_cla"] = "connectivity";
@@ -2704,16 +2704,14 @@ void haConfigButton(String tag, String payload_press, String icon)
   // clean string
   tag.replace(" ", "_");
   tag.toLowerCase();
-  String deviceId = hostname;
-  deviceId.toLowerCase();
   //
-  haConfig["unique_id"] = deviceId + "_" + tag;
+  haConfig["unique_id"] = getId() + "_" + tag;
   if (strcmp(payload_press.c_str(), "restart") == 0)
   {
     haConfig["dev_cla"] = "restart";
   }
   haConfig["command_topic"] = ha_system_set_topic;
-  haConfig["entity_category"] = "config";
+  haConfig["entity_category"] = "diagnostic";
   haConfig["payload_press"] = payload_press; //"restart", "factory", "upgrade" ;
 
   JsonObject haConfigDevice = haConfig["device"].to<JsonObject>();
@@ -2727,7 +2725,7 @@ void haConfigButton(String tag, String payload_press, String icon)
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_button = "homeassistant/button/" + deviceId + "/" + tag + "/config";
+  String ha_config_topic_button = "homeassistant/button/" + getId() + "/" + tag + "/config";
   mqttClient->publish(ha_config_topic_button.c_str(), 1, true, mqttOutput.c_str());
 }
 
@@ -2844,7 +2842,8 @@ void sendHaConfig()
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
-
+  // Button
+  haConfigButton("Restart", "restart", "mdi:restart");
   // Temperature sensors
   haConfigTemp("roomTemperature", "mdi:thermometer");
   // Freq sensor
@@ -2856,8 +2855,6 @@ void sendHaConfig()
   haConfigSensor("Free Heap", "%", "mdi:memory");
   haConfigSensor("RSSI", "dBm", "mdi:network-strength-1");
   haConfigSensor("BSSI", "", "mdi:router-wireless");
-  // Button
-  haConfigButton("Restart", "restart", "mdi:restart");
 }
 
 void mqttConnect()
