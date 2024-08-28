@@ -97,7 +97,7 @@ namespace ca
   const char txt_others_rx_pin[] PROGMEM = "RX pin (ESP32, 0 use UART1)";
   const char txt_others_tz[] PROGMEM = "Fus horari";
   const char txt_others_tz_list[] PROGMEM = "Vegeu-ne la llista";
-  const char txt_others_ntp_server[] PROGMEM = "Server NTP";
+  const char txt_others_ntp_server[] PROGMEM = "Servidor NTP";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Estat";
