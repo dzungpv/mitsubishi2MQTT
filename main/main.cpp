@@ -798,7 +798,7 @@ void initMqtt()
     static_cast<espMqttClientSecure *>(mqttClient)->setServer(mqtt_server.c_str(), atoi(mqtt_port.c_str()));
     static_cast<espMqttClientSecure *>(mqttClient)->setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
     static_cast<espMqttClientSecure *>(mqttClient)->setClientId(mqtt_client_id.c_str());
-    static_cast<espMqttClientSecure *>(mqttClient)->setWill(ha_availability_topic.c_str(), 1, true, mqtt_payload_unavailable);
+    static_cast<espMqttClientSecure *>(mqttClient)->setWill(ha_availability_topic.c_str(), 1, false, mqtt_payload_unavailable);
 #endif
   }
   else
@@ -814,7 +814,7 @@ void initMqtt()
     static_cast<espMqttClient *>(mqttClient)->setServer(mqtt_server.c_str(), atoi(mqtt_port.c_str()));
     static_cast<espMqttClient *>(mqttClient)->setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
     static_cast<espMqttClient *>(mqttClient)->setClientId(mqtt_client_id.c_str());
-    static_cast<espMqttClient *>(mqttClient)->setWill(ha_availability_topic.c_str(), 1, true, mqtt_payload_unavailable);
+    static_cast<espMqttClient *>(mqttClient)->setWill(ha_availability_topic.c_str(), 1, false, mqtt_payload_unavailable);
   }
 
   const char *apipch = mqtt_server.c_str();
@@ -2071,7 +2071,7 @@ void hpSettingsChanged()
   {
     String mqttOutput;
     serializeJson(rootInfo, mqttOutput);
-    if (!mqttClient->publish(ha_settings_topic.c_str(), 1, true, mqttOutput.c_str()))
+    if (!mqttClient->publish(ha_settings_topic.c_str(), 1, false, mqttOutput.c_str()))
     {
       if (_debugModeLogs)
         mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, (char *)("Failed to publish hp settings"));
@@ -2243,7 +2243,6 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   events.send(currentSettings.mode, "mode", millis(), 100);
   events.send(currentSettings.power, "power", millis(), 110);
   rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
-  rootInfo["up_time"] = getUpTime();
   if (mqttClient != nullptr && mqttClient->connected())
   {
     String mqttOutput;
@@ -2278,12 +2277,16 @@ void sendKeepAlive()
   // send keep alive message
   if (mqttClient != nullptr && mqttClient->connected())
   {
-    if (!mqttClient->publish(ha_availability_topic.c_str(), 1, true, mqtt_payload_available))
+    if (!mqttClient->publish(ha_availability_topic.c_str(), 1, false, mqtt_payload_available))
     {
       if (_debugModeLogs)
         mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, (char *)"Failed to publish avialable status");
     }
     sendDeviceInfo();
+    if (hp.isConnected())
+    {
+        hpStatusChanged(hp.getStatus());
+    }
   }
 }
 
@@ -2749,9 +2752,10 @@ void sendDeviceInfo()
   // get wifi rssi
   haConfigInfo["rssi"] = String(WiFi.RSSI());
   haConfigInfo["bssi"] = getWifiBSSID();
+  haConfigInfo["up_time"] = getUpTime();
   String mqttOutput;
   serializeJson(haConfigInfo, mqttOutput);
-  mqttClient->publish(ha_system_setting_info.c_str(), 1, true, mqttOutput.c_str());
+  mqttClient->publish(ha_system_setting_info.c_str(), 1, false, mqttOutput.c_str());
 }
 
 void sendHaConfig()
@@ -3096,12 +3100,6 @@ void loop()
 #endif
     if (wifiConnected && mqtt_connected)
     {
-      // only send the temperature every SEND_ROOM_TEMP_INTERVAL_MS (millis rollover tolerant)
-      // if (millis() - lastTempSend > SEND_ROOM_TEMP_INTERVAL_MS)
-      // {
-      //   hpStatusChanged(hp.getStatus());
-      //   lastTempSend = millis();
-      // }
       sendKeepAlive();
     }
   }
@@ -3236,7 +3234,7 @@ void onMqttConnect(bool sessionPresent)
   mqttClient->subscribe(ha_remote_temp_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_custom_packet.c_str(), 1);
   // send online message
-  mqttClient->publish(ha_availability_topic.c_str(), 1, true, mqtt_payload_available);
+  mqttClient->publish(ha_availability_topic.c_str(), 1, false, mqtt_payload_available);
   sendHaConfig();
 }
 
