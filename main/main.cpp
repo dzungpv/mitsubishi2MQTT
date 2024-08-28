@@ -3499,28 +3499,60 @@ bool isSecureEnable()
 void getWifiList()
 {
   int n = WiFi.scanComplete();
-  if (n >= 0)
-  {
-    int max = min(5, n);
-    wifi_list = "";
-    for (int i = 0; i < max; ++i) // only first 5 networkd
-    {
-      String ssid = WiFi.SSID(i);
-      if (!ssid.isEmpty())
-      {
-        ESP_LOGI(TAG, "Found %s: ", ssid.c_str());
-        if (i == 0)
-        {
-          wifi_list += ssid;
-        }
-        else
-        {
-          wifi_list += ";" + ssid;
-        }
+  if (n < 0) return;
+
+  const int k = 5; // top k results
+
+  int top_k_idx[k] = {};
+  int32_t top_k_rssi[k];
+  for (auto i = 0; i < k; i++) {
+    top_k_rssi[i] = INT32_MIN;
+  }
+
+  // find top k rssi. k = 5 => n*k => O(n)
+  for (int i = 0; i < n; i++) {
+    int min_index = 0;
+    for (int j = 0; j < k; j++) {
+      if (top_k_rssi[j] < top_k_rssi[min_index]) {
+        min_index = j;
       }
     }
-    WiFi.scanDelete();
+    int32_t rssi = WiFi.RSSI(i);
+    if (rssi > top_k_rssi[min_index]) {
+      top_k_rssi[min_index] = rssi;
+      top_k_idx[min_index] = i;
+    }
   }
+
+  // sort by rssi. k = 5 => k^2 is O(c)
+  for (int i = 0; i < k-1; i++) {
+    for (int j = i + 1; j < k; j++ ) {
+      if (top_k_rssi[i] < top_k_rssi[j]) {
+        std::swap(top_k_rssi[i], top_k_rssi[j]);
+        std::swap(top_k_idx[i], top_k_idx[j]);
+      }
+    }
+  }
+
+  wifi_list.clear();
+  for (int i = 0; i < k; ++i) // only first 5 networkd
+  {
+    int idx = top_k_idx[i];
+    String ssid = WiFi.SSID(idx);
+    if (!ssid.isEmpty())
+    {
+      ESP_LOGI(TAG, "Found %s: ", ssid.c_str());
+      if (i == 0)
+      {
+        wifi_list += ssid;
+      }
+      else
+      {
+        wifi_list += ";" + ssid;
+      }
+    }
+  }
+  WiFi.scanDelete();
 }
 
 String getWifiOptions(bool send)
