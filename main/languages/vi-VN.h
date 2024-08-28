@@ -97,7 +97,8 @@ namespace vi
   const char txt_others_rx_pin[] PROGMEM = "Chân RX (ESP32, 0 dùng UART1)";
   const char txt_others_tz[] PROGMEM = "Múi giờ";
   const char txt_others_tz_list[] PROGMEM = "Xem danh sách";
-  
+  const char txt_others_ntp_server[] PROGMEM = "Máy chủ NTP";
+
   // Page Status
   const char txt_status_title[] PROGMEM = "Trạng thái";
   const char txt_status_hvac[] PROGMEM = "Trạng thái ĐH";

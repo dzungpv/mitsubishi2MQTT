@@ -95,9 +95,10 @@ namespace ja
   const char txt_others_debug_log[] PROGMEM = "MQTT topic debug logs";
   const char txt_others_tx_pin[] PROGMEM = "TX pin (ESP32, 0 use UART1)";
   const char txt_others_rx_pin[] PROGMEM = "RX pin (ESP32, 0 use UART1)";
-  const char txt_others_tz[] PROGMEM = "Timezone";
-  const char txt_others_tz_list[] PROGMEM = "See list";
-  
+  const char txt_others_tz[] PROGMEM = "タイムゾーン";
+  const char txt_others_tz_list[] PROGMEM = "リストを見る";
+  const char txt_others_ntp_server[] PROGMEM = "NTP サーバー";
+
   // Page Status
   const char txt_status_title[] PROGMEM = "ステータス";
   const char txt_status_hvac[] PROGMEM = "エアコン本体";

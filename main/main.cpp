@@ -543,7 +543,7 @@ bool loadOthers()
     return false;
   }
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(7) + 350;
+  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, configFile);
   // unit
@@ -580,6 +580,10 @@ bool loadOthers()
   if (doc.containsKey("tz")) // check key to prevent data is "null" if not exist
   {
     timezone = doc["tz"].as<String>();
+  }
+  if (doc.containsKey("ntp"))
+  {
+    ntpServer = doc["ntp"].as<String>();
   }
   return true;
 }
@@ -686,10 +690,10 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   configFile.close();
 }
 
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz)
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz, const String &ntp)
 {
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(7) + 350;
+  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
   DynamicJsonDocument doc(capacity);
   doc["haa"] = haa;
   doc["haat"] = haat;
@@ -698,6 +702,7 @@ void saveOthers(const String& haa, const String& haat, const String& debugPckts,
   doc["txPin"] = txPin;
   doc["rxPin"] = rxPin;
   doc["tz"] = tz;
+  doc["ntp"] = ntp;
   File configFile = SPIFFS.open(others_conf, "w");
   if (!configFile)
   {
@@ -712,7 +717,7 @@ void saveCurrentOthers()
   String haa = others_haa ? "ON" : "OFF";
   String debugPckts = _debugModePckts ? "ON" : "OFF";
   String debugLogs = _debugModeLogs ? "ON" : "OFF";
-  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, String(HP_TX), String(HP_RX), timezone);
+  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, String(HP_TX), String(HP_RX), timezone, ntpServer);
 }
 
 // Initialize captive portal page
@@ -1138,7 +1143,7 @@ void handleOthers(AsyncWebServerRequest *request)
   checkLogin(request);
   if (request->hasArg("save"))
   {
-    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"));
+    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
     saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
@@ -1156,6 +1161,7 @@ void handleOthers(AsyncWebServerRequest *request)
     othersPage.replace("_TXT_OTHERS_DEBUG_PCKTS_", translatedWord(FL_(txt_others_debug_packets)));
     othersPage.replace("_TXT_OTHERS_DEBUG_LOGS_", translatedWord(FL_(txt_others_debug_log)));
     othersPage.replace("_TXT_OTHERS_TIME_ZONE_", translatedWord(FL_(txt_others_tz)));
+    othersPage.replace("_TXT_OTHER_NTP_SERVER_", translatedWord(FL_(txt_others_ntp_server)));
     othersPage.replace("_SEE_TZ_LIST", translatedWord(FL_(txt_others_tz_list)));
     othersPage.replace("_TXT_TX_PIN_", translatedWord(FL_(txt_others_tx_pin)));
     othersPage.replace("_TXT_RX_PIN_", translatedWord(FL_(txt_others_rx_pin)));
@@ -1168,6 +1174,7 @@ void handleOthers(AsyncWebServerRequest *request)
     othersPage.replace("_TX_PIN_", String(HP_TX));
     othersPage.replace("_RX_PIN_", String(HP_RX));
     othersPage.replace("_TIME_ZONE_", timezone);
+    othersPage.replace("_NTP_SERVER_", String(ntpServer));
     if (others_haa)
     {
       othersPage.replace("_HAA_ON_", "selected");

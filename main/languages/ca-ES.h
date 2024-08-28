@@ -97,6 +97,7 @@ namespace ca
   const char txt_others_rx_pin[] PROGMEM = "RX pin (ESP32, 0 use UART1)";
   const char txt_others_tz[] PROGMEM = "Fus horari";
   const char txt_others_tz_list[] PROGMEM = "Vegeu-ne la llista";
+  const char txt_others_ntp_server[] PROGMEM = "Server NTP";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Estat";
@@ -177,7 +178,7 @@ namespace ca
   const char txt_upload_success[] PROGMEM = "Correcta";
   const char txt_upload_refresh[] PROGMEM = "Refrescant en";
 
-  // Page Init  
+  // Page Init
   const char txt_init_title[] PROGMEM = "Configuració inicial";
   const char txt_init_reboot_mes[] PROGMEM = "S'està reiniciant i connectant a la xarxa WiFi! Hauries de veure'l llistat al teu punt d'accés.";
   const char txt_init_reboot_mes_1[] PROGMEM = "Utilitzeu aquesta adreça per accedir al vostre dispositiu després de reiniciar-lo. S'està reiniciant";
