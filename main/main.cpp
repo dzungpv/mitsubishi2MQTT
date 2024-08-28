@@ -2963,47 +2963,51 @@ bool connectWifi()
   }
   if (!ok || !static_valid) {
     // fallback to DHCP
+#ifdef ESP32
+    WiFi.config(static_cast<IPAddress>(0), static_cast<IPAddress>(0), static_cast<IPAddress>(0));
+#else
     WiFi.config(0, 0, 0);
-  }
-  WiFi.begin(ap_ssid.c_str(), ap_pwd.c_str());
-  ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
-  wifi_timeout = millis() + 30000;
-  while (WiFi.status() != WL_CONNECTED && millis() < wifi_timeout)
-  {
-    ESP_LOGD(TAG, ".");
-    // Serial.print(WiFi.status());
-    //  wait 500ms, flashing the blue LED to indicate WiFi connecting...
-    digitalWrite(blueLedPin, LOW);
-    delay(250);
+#endif
+    }
+    WiFi.begin(ap_ssid.c_str(), ap_pwd.c_str());
+    ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
+    wifi_timeout = millis() + 30000;
+    while (WiFi.status() != WL_CONNECTED && millis() < wifi_timeout)
+	{
+        ESP_LOGD(TAG, ".");
+        // Serial.print(WiFi.status());
+        //  wait 500ms, flashing the blue LED to indicate WiFi connecting...
+        digitalWrite(blueLedPin, LOW);
+        delay(250);
+        digitalWrite(blueLedPin, HIGH);
+        delay(250);
+    }
+    if (WiFi.status() != WL_CONNECTED)
+	{
+        ESP_LOGD(TAG, "Failed to connect to wifi");
+        return false;
+    }
+    ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
+    ESP_LOGD(TAG, "Ready, IP address: ");
+    unsigned long dhcpStartTime = millis();
+    while ((WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "") && millis() - dhcpStartTime < 5000)
+	{
+        ESP_LOGD(TAG, ".");
+        delay(500);
+    }
+    if (WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "")
+	{
+        ESP_LOGD(TAG, "Failed to get IP address");
+        return false;
+    }
+    ESP_LOGD(TAG, "%s", WiFi.localIP().toString().c_str());
+    ticker.detach();  // Stop blinking the LED because now we are connected:)
+    // keep LED off (For Wemos D1-Mini)
     digitalWrite(blueLedPin, HIGH);
-    delay(250);
-  }
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    ESP_LOGD(TAG, "Failed to connect to wifi");
-    return false;
-  }
-  ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
-  ESP_LOGD(TAG, "Ready, IP address: ");
-  unsigned long dhcpStartTime = millis();
-  while ((WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "") && millis() - dhcpStartTime < 5000)
-  {
-    ESP_LOGD(TAG, ".");
-    delay(500);
-  }
-  if (WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "")
-  {
-    ESP_LOGD(TAG, "Failed to get IP address");
-    return false;
-  }
-  ESP_LOGD(TAG, "%s", WiFi.localIP().toString().c_str());
-  ticker.detach(); // Stop blinking the LED because now we are connected:)
-  // keep LED off (For Wemos D1-Mini)
-  digitalWrite(blueLedPin, HIGH);
-  // Auto reconnected
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(true);
-  return true;
+    // Auto reconnected
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+    return true;
 }
 
 // temperature helper functions
