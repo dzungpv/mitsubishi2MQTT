@@ -3171,7 +3171,7 @@ void WiFiEvent(WiFiEvent_t event)
       digitalWrite(blueLedPin, LOW);
       xTimerStart(mqttReconnectTimer, 0); // start timer to connect to MQTT
       // init and get the time
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer.c_str());
     }
   }
   else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
