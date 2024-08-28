@@ -2243,7 +2243,7 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   events.send(currentSettings.mode, "mode", millis(), 100);
   events.send(currentSettings.power, "power", millis(), 110);
   rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
-  rootInfo["upTime"] = getUpTime();
+  rootInfo["up_time"] = getUpTime();
   if (mqttClient != nullptr && mqttClient->connected())
   {
     String mqttOutput;
@@ -2846,7 +2846,7 @@ void sendHaConfig()
   // Freq sensor
   haConfigFreq("compressorFreq", "Hz", "mdi:sine-wave");
   // Up time
-  haConfigSensor("upTime", "", "mdi:clock");
+  haConfigSensor("Up Time", "", "mdi:clock");
   // HVAC connection state
   haConfigSensor("Connection state", "", "mdi:check-network");
   haConfigSensor("Free Heap", "%", "mdi:memory");
