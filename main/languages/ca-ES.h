@@ -124,6 +124,10 @@ namespace ca
   const char txt_wifi_ssid_select[] PROGMEM = "o trieu una xarxa:";
   const char txt_wifi_psk[] PROGMEM = "Contrasenya Wifi";
   const char txt_wifi_otap[] PROGMEM = "Contrasenya OTA";
+  const char txt_wifi_static_ip[] PROGMEM = "Adreça IP estàtica";
+  const char txt_wifi_static_gw[] PROGMEM = "Adreça de passarel·la";
+  const char txt_wifi_static_mask[] PROGMEM = "Màscara de xarxa";
+  const char txt_wifi_static_dns[] PROGMEM = "Adreça IP DNS";
 
   // Page Control
   const char txt_ctrl_title[] PROGMEM = "Control climatització";

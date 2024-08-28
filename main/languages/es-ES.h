@@ -124,6 +124,10 @@ namespace es
   const char txt_wifi_hostname_desc[] PROGMEM = "(no space or special char)";
   const char txt_wifi_ssid_enter[] PROGMEM = "(Enter a name)";
   const char txt_wifi_ssid_select[] PROGMEM = "or choose a network:";
+  const char txt_wifi_static_ip[] PROGMEM = "Dirección IP estática";
+  const char txt_wifi_static_gw[] PROGMEM = "Dirección de puerta de enlace";
+  const char txt_wifi_static_mask[] PROGMEM = "Máscara de red";
+  const char txt_wifi_static_dns[] PROGMEM = "Dirección IP DNS";
 
   // Page Control
   const char txt_ctrl_title[] PROGMEM = "Control del aparato";

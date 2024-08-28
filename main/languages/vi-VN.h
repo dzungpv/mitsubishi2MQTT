@@ -124,6 +124,10 @@ namespace vi
   const char txt_wifi_ssid_select[] PROGMEM = "hoặc chọn 1 mạng:";
   const char txt_wifi_psk[] PROGMEM = "Mật khẩu Wifi";
   const char txt_wifi_otap[] PROGMEM = "Mật khẩu OTA";
+  const char txt_wifi_static_ip[] PROGMEM = "Địa chỉ IP tĩnh";
+  const char txt_wifi_static_gw[] PROGMEM = "Địa chỉ cổng";
+  const char txt_wifi_static_mask[] PROGMEM = "Mặt nạ mạng";
+  const char txt_wifi_static_dns[] PROGMEM = "Địa chỉ IP DNS";
 
   // Page Control
   const char txt_ctrl_title[] PROGMEM = "Điều khiển Thiết bị";

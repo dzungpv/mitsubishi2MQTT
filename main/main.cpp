@@ -334,7 +334,7 @@ bool loadWifi()
     return false;
   }
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(4) + 130;
+  const size_t capacity = JSON_OBJECT_SIZE(8) + 130 + 4*(16 /*ipv4 addr*/ + 15 /*max key size*/);
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, configFile);
   // Check key exist to prevent data is "null"
@@ -344,7 +344,7 @@ bool loadWifi()
   }
   else
   {
-    hostname = "";
+    hostname.clear();
   }
   if (doc.containsKey("ap_ssid"))
   {
@@ -352,7 +352,7 @@ bool loadWifi()
   }
   else
   {
-    ap_ssid = "";
+    ap_ssid.clear();
   }
   if (doc.containsKey("ap_pwd"))
   {
@@ -360,7 +360,7 @@ bool loadWifi()
   }
   else
   {
-    ap_pwd = "";
+    ap_pwd.clear();
   }
   if (doc.containsKey("ota_pwd"))
   {
@@ -368,8 +368,43 @@ bool loadWifi()
   }
   else
   {
-    ota_pwd = "";
+    ota_pwd.clear();
   }
+
+  // static IP configuration
+  if (doc.containsKey("static_ip"))
+  {
+    wifi_static_ip = doc["static_ip"].as<String>();
+  }
+  else
+  {
+    wifi_static_ip.clear();
+  }
+  if (doc.containsKey("static_gw_ip"))
+  {
+    wifi_static_gateway_ip = doc["static_gw_ip"].as<String>();
+  }
+  else
+  {
+    wifi_static_gateway_ip.clear();
+  }
+  if (doc.containsKey("static_subnet"))
+  {
+    wifi_static_subnet = doc["static_subnet"].as<String>();
+  }
+  else
+  {
+    wifi_static_subnet.clear();
+  }
+  if (doc.containsKey("static_dns_ip"))
+  {
+    wifi_static_dns_ip = doc["static_dns_ip"].as<String>();
+  }
+  else
+  {
+    wifi_static_dns_ip.clear();
+  }
+
   return true;
 }
 
@@ -668,10 +703,10 @@ void saveUnit(String tempUnit, String supportMode, String supportFanMode, String
   configFile.close();
 }
 
-void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd)
+void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd, const String& local_ip, const String& gw_ip, const String& subnet_ip, const String& dns_ip)
 {
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(4) + 130;
+  const size_t capacity = JSON_OBJECT_SIZE(8) + 130 + 4*(16 /*ipv4 addr*/ + 15 /*max key size*/);
   DynamicJsonDocument doc(capacity);
   if (hostName.isEmpty())
   {
@@ -681,6 +716,14 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   doc["ap_pwd"] = apPwd;
   doc["hostname"] = hostName;
   doc["ota_pwd"] = otaPwd;
+  if (!local_ip.isEmpty() && !gw_ip.isEmpty() && !subnet_ip.isEmpty()) {
+    doc["static_ip"] = local_ip;
+    doc["static_gw_ip"] = gw_ip;
+    doc["static_subnet"] = subnet_ip;
+    if (!dns_ip.isEmpty()) {
+      doc["static_dns_ip"] = dns_ip;
+    }
+  }
   File configFile = SPIFFS.open(wifi_conf, "w");
   if (!configFile)
   {
@@ -987,7 +1030,7 @@ void handleSaveWifiAndMqtt(AsyncWebServerRequest *request)
     {
       ssid = request->arg("network"); // auto scan network
     }
-    saveWifi(ssid, request->arg("psk"), request->arg("hn"), request->arg("otapwd"));
+    saveWifi(ssid, request->arg("psk"), request->arg("hn"), request->arg("otapwd"), request->arg("stip"), request->arg("stgw"), request->arg("stmask"), request->arg("stdns"));
     if (request->hasArg("mh"))
     {
       saveMqtt(request->arg("fn"), request->arg("mh"), request->arg("ml"), request->arg("mu"), request->arg("mp"), request->arg("mt"), "");
@@ -1063,6 +1106,10 @@ void handleInitSetup(AsyncWebServerRequest *request)
   initSetupPage.replace("_TXT_WIFI_SSID_SELECT_", translatedWord(FL_(txt_wifi_ssid_select)));
   initSetupPage.replace("_TXT_WIFI_SSID_", translatedWord(FL_(txt_wifi_ssid)));
   initSetupPage.replace("_TXT_WIFI_PSK_", translatedWord(FL_(txt_wifi_psk)));
+  initSetupPage.replace("_TXT_WIFI_STATIC_IP_", translatedWord(FL_(txt_wifi_static_ip)));
+  initSetupPage.replace("_TXT_WIFI_STATIC_GW_", translatedWord(FL_(txt_wifi_static_gw)));
+  initSetupPage.replace("_TXT_WIFI_STATIC_MASK_", translatedWord(FL_(txt_wifi_static_mask)));
+  initSetupPage.replace("_TXT_WIFI_STATIC_DNS_", translatedWord(FL_(txt_wifi_static_dns)));
   initSetupPage.replace("_TXT_MQTT_TITLE_", translatedWord(FL_(txt_mqtt_title)));
   initSetupPage.replace("_TXT_MQTT_PH_USER_", translatedWord(FL_(txt_mqtt_ph_user)));
   initSetupPage.replace("_TXT_MQTT_PH_PWD_", translatedWord(FL_(txt_mqtt_ph_pwd)));
@@ -1347,7 +1394,7 @@ void handleWifi(AsyncWebServerRequest *request)
       ssid = request->arg("network"); // auto scan network
     }
     ESP_LOGD(TAG, "handleWifi: %s", ssid.c_str());
-    saveWifi(ssid, request->arg("psk"), request->arg("hn"), request->arg("otapwd"));
+    saveWifi(ssid, request->arg("psk"), request->arg("hn"), request->arg("otapwd"), request->arg("stip"), request->arg("stgw"), request->arg("stmask"), request->arg("stdns"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
     saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
@@ -1372,6 +1419,10 @@ void handleWifi(AsyncWebServerRequest *request)
     wifiPage.replace("_TXT_WIFI_SSID_", translatedWord(FL_(txt_wifi_ssid)));
     wifiPage.replace("_TXT_WIFI_PSK_", translatedWord(FL_(txt_wifi_psk)));
     wifiPage.replace("_TXT_WIFI_OTAP_", translatedWord(FL_(txt_wifi_otap)));
+    wifiPage.replace("_TXT_WIFI_STATIC_IP_", translatedWord(FL_(txt_wifi_static_ip)));
+    wifiPage.replace("_TXT_WIFI_STATIC_GW_", translatedWord(FL_(txt_wifi_static_gw)));
+    wifiPage.replace("_TXT_WIFI_STATIC_MASK_", translatedWord(FL_(txt_wifi_static_mask)));
+    wifiPage.replace("_TXT_WIFI_STATIC_DNS_", translatedWord(FL_(txt_wifi_static_dns)));
     wifiPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
     wifiPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
     // set data
@@ -1390,6 +1441,10 @@ void handleWifi(AsyncWebServerRequest *request)
     wifiPage.replace(F("_SSID_"), str_ap_ssid);
     wifiPage.replace(F("_PSK_"), str_ap_pwd);
     wifiPage.replace(F("_OTA_PWD_"), str_ota_pwd);
+    wifiPage.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
+    wifiPage.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
+    wifiPage.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
+    wifiPage.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
     String fwCheckEvents = FPSTR(fw_check_script_events);
     sendWrappedHTML(request, fwCheckEvents + wifiPage);
   }
@@ -2883,6 +2938,33 @@ bool connectWifi()
     WiFi.mode(WIFI_STA);
     delay(100);
   }
+  bool static_valid = true;
+  IPAddress local_ip, gw_ip, subnet_ip, dns_ip;
+  if (static_valid && !local_ip.fromString(wifi_static_ip)) {
+    static_valid = false;
+  }
+  if (static_valid && !gw_ip.fromString(wifi_static_gateway_ip)) {
+    static_valid = false;
+  }
+  if (static_valid && !subnet_ip.fromString(wifi_static_subnet)) {
+    static_valid = false;
+  }
+  if (static_valid) {
+    if (wifi_static_dns_ip.isEmpty()) {
+      dns_ip = gw_ip;
+    } else if (!dns_ip.fromString(wifi_static_dns_ip)) {
+      static_valid = false;
+    }
+  }
+
+  bool ok = false;
+  if (static_valid) {
+    ok = WiFi.config(local_ip, gw_ip, subnet_ip, dns_ip);
+  }
+  if (!ok || !static_valid) {
+    // fallback to DHCP
+    WiFi.config(0, 0, 0);
+  }
   WiFi.begin(ap_ssid.c_str(), ap_pwd.c_str());
   ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
   wifi_timeout = millis() + 30000;
@@ -3611,6 +3693,7 @@ String getValueBySeparator(const String& data, char separator, int index)
 void factoryReset()
 {
   SPIFFS.format();
+  WiFi.disconnect(true, true);
 #ifdef ESP32
   // delete nvs partition because AP mode not working if have other data
   esp_err_t err = nvs_flash_erase();
