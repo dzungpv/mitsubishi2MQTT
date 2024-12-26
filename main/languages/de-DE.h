@@ -31,19 +31,19 @@ namespace de
   // Setup Menu
   const char txt_mqtt[] PROGMEM = "MQTT";
   const char txt_wifi[] PROGMEM = "WLAN";
-  const char txt_unit[] PROGMEM = "Einheiten";
-  const char txt_others[] PROGMEM = "weiteres";
+  const char txt_unit[] PROGMEM = "Gerät";
+  const char txt_others[] PROGMEM = "Weiteres";
   const char txt_reset[] PROGMEM = "Einstellungen zurücksetzen";
   const char txt_reset_confirm[] PROGMEM = "Willst du wirklich alle Einstellungen zurücksetzen?";
-  const char txt_mqtt_fn_desc[] PROGMEM = "(no space or special char)";
-  const char txt_mqtt_port_desc[] PROGMEM = "(default 1883, ESP32: 8883 CERT require)";
-  const char txt_mqtt_ph_topic[] PROGMEM = "Enter Mqtt topic";
-  const char txt_mqtt_ph_user[] PROGMEM = "Enter Mqtt user";
-  const char txt_mqtt_ph_pwd[] PROGMEM = "Enter Mqtt password";
+  const char txt_mqtt_fn_desc[] PROGMEM = "(kein Leer- oder Sonderzeichen)";
+  const char txt_mqtt_port_desc[] PROGMEM = "(Standard 1883, ESP32: 8883 CERT benötigt)";
+  const char txt_mqtt_ph_topic[] PROGMEM = "Mqtt Topic eingeben";
+  const char txt_mqtt_ph_user[] PROGMEM = "Mqtt Nutzer eingeben";
+  const char txt_mqtt_ph_pwd[] PROGMEM = "Mqtt Passwort eingeben";
 
   // Buttons
-  const char txt_back[] PROGMEM = "zurück";
-  const char txt_save[] PROGMEM = "speichern & neustart";
+  const char txt_back[] PROGMEM = "Zurück";
+  const char txt_save[] PROGMEM = "Speichern & Neustart";
   const char txt_logout[] PROGMEM = "ABMELDEN";
   const char txt_upgrade[] PROGMEM = "Upgrade starten";
   const char txt_login[] PROGMEM = "ANMELDEN";
@@ -62,9 +62,9 @@ namespace de
   const char txt_f_pos[] PROGMEM = "POSITION";
   const char txt_f_celsius[] PROGMEM = "Celsius";
   const char txt_f_fh[] PROGMEM = "Fahrenheit";
-  const char txt_f_allmodes[] PROGMEM = "jeder Modus";
-  const char txt_f_noheat[] PROGMEM = "jeder Modus, außer heizen";
-  const char txt_f_noquiet[] PROGMEM = "Not support quiet mode";
+  const char txt_f_allmodes[] PROGMEM = "alle Modi";
+  const char txt_f_noheat[] PROGMEM = "alle Modi außer Heizen";
+  const char txt_f_noquiet[] PROGMEM = "alle Modi außer Flüstermodus";
   const char txt_f_low[] PROGMEM = "LOW";
   const char txt_f_medium[] PROGMEM = "MEDIUM";
   const char txt_f_middle[] PROGMEM = "MIDDLE";
@@ -94,25 +94,25 @@ namespace de
   const char txt_others_debug_log[] PROGMEM = "MQTT topic debug logs";
   const char txt_others_tx_pin[] PROGMEM = "TX pin (ESP32, 0 use UART1)";
   const char txt_others_rx_pin[] PROGMEM = "RX pin (ESP32, 0 use UART1)";
-  const char txt_others_tz[] PROGMEM = "Timezone";
-  const char txt_others_tz_list[] PROGMEM = "See list";
+  const char txt_others_tz[] PROGMEM = "Zeitzone";
+  const char txt_others_tz_list[] PROGMEM = "siehe Liste";
   const char txt_others_ntp_server[] PROGMEM = "NTP Server";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Status";
   const char txt_status_hvac[] PROGMEM = "HVAC Status";
-  const char txt_retries_hvac[] PROGMEM = "HVAC Connection Retries";
+  const char txt_retries_hvac[] PROGMEM = "HVAC Verbindungsversuche";
   const char txt_status_mqtt[] PROGMEM = "MQTT Status";
   const char txt_status_wifi[] PROGMEM = "WLAN RSSI";
-  const char txt_status_connect[] PROGMEM = "CONNECTED";
-  const char txt_status_disconnect[] PROGMEM = "DISCONNECTED";
+  const char txt_status_connect[] PROGMEM = "VERBUNDEN";
+  const char txt_status_disconnect[] PROGMEM = "GETRENNT";
   const char txt_status_wifi_ip[] PROGMEM = "WIFI IP";
-  const char txt_failed_get_wifi_ip[] PROGMEM = "Failed to get IP address";
+  const char txt_failed_get_wifi_ip[] PROGMEM = "Fehler bei Erhalt IP Adresse";
   const char txt_build_version[] PROGMEM = "Build Version";
-  const char txt_build_date[] PROGMEM = "Build Date";
+  const char txt_build_date[] PROGMEM = "Build Datum";
   const char txt_status_freeheap[] PROGMEM = "Free Heap";
-  const char txt_current_time[] PROGMEM = "Current Time";
-  const char txt_boot_time[] PROGMEM = "Boot Time";
+  const char txt_current_time[] PROGMEM = "Akt. Uhrzeit";
+  const char txt_boot_time[] PROGMEM = "Betriebszeit";
 
   // Page WIFI
   const char txt_wifi_title[] PROGMEM = "WLAN Parameter";
@@ -120,18 +120,18 @@ namespace de
   const char txt_wifi_ssid[] PROGMEM = "SSID";
   const char txt_wifi_psk[] PROGMEM = "PSK";
   const char txt_wifi_otap[] PROGMEM = "OTA Passwort";
-  const char txt_wifi_hostname_desc[] PROGMEM = "(no space or special char)";
-  const char txt_wifi_ssid_enter[] PROGMEM = "(Enter a name)";
-  const char txt_wifi_ssid_select[] PROGMEM = "or choose a network:";
-  const char txt_wifi_static_ip[] PROGMEM = "Static IP address";
-  const char txt_wifi_static_gw[] PROGMEM = "Gateway address";
-  const char txt_wifi_static_mask[] PROGMEM = "Network mask";
-  const char txt_wifi_static_dns[] PROGMEM = "DNS IP address";
+  const char txt_wifi_hostname_desc[] PROGMEM = "(kein Leer- oder Sonderzeichen)";
+  const char txt_wifi_ssid_enter[] PROGMEM = "(Gib einen Namen ein)";
+  const char txt_wifi_ssid_select[] PROGMEM = "oder wähle ein Netzwerk:";
+  const char txt_wifi_static_ip[] PROGMEM = "Statische IP Adresse";
+  const char txt_wifi_static_gw[] PROGMEM = "Gateway Adresse";
+  const char txt_wifi_static_mask[] PROGMEM = "Netzwerkmaske";
+  const char txt_wifi_static_dns[] PROGMEM = "DNS IP Adresse";
 
   // Page Control
   const char txt_ctrl_title[] PROGMEM = "Kontrolleinheit";
   const char txt_ctrl_temp[] PROGMEM = "Temperatur";
-  const char txt_ctrl_power[] PROGMEM = "Power";
+  const char txt_ctrl_power[] PROGMEM = "Leistung";
   const char txt_ctrl_mode[] PROGMEM = "Modus";
   const char txt_ctrl_fan[] PROGMEM = "Lüfter";
   const char txt_ctrl_vane[] PROGMEM = "Leitschaufel";
@@ -139,28 +139,28 @@ namespace de
   const char txt_ctrl_ctemp[] PROGMEM = "Raumtemperatur";
 
   // Page Unit
-  const char txt_unit_title[] PROGMEM = "Unit configuration";
+  const char txt_unit_title[] PROGMEM = "Gerätekonfiguration";
   const char txt_unit_temp[] PROGMEM = "Temperatureinheit";
   const char txt_unit_maxtemp[] PROGMEM = "max. Temperatur";
   const char txt_unit_mintemp[] PROGMEM = "min. Temperatur";
   const char txt_unit_steptemp[] PROGMEM = "Temperaturschritte";
-  const char txt_unit_modes[] PROGMEM = "unterstützter Modus";
-  const char txt_unit_password[] PROGMEM = "Web Passwort";
-  const char txt_unit_language[] PROGMEM = "Language";
-  const char txt_unit_fan_modes[] PROGMEM = "Fan mode support";
-  const char txt_unit_password_confirm[] PROGMEM = "Confirm Login password";
-  const char txt_unit_password_not_match[] PROGMEM = "Confirm Password did not match";
-  const char txt_unit_login_username[] PROGMEM = "Note: Default login user is";
+  const char txt_unit_modes[] PROGMEM = "Unterstützte Modi";
+  const char txt_unit_language[] PROGMEM = "Sprache";
+  const char txt_unit_fan_modes[] PROGMEM = "Unterstützte Lüftermodi";
+  const char txt_unit_password[] PROGMEM = "Passwort Nutzeroberfläche";
+  const char txt_unit_password_confirm[] PROGMEM = "Passwort Wiederholung";
+  const char txt_unit_password_not_match[] PROGMEM = "Passwörter stimmen nicht überein";
+  const char txt_unit_login_username[] PROGMEM = "Hinweis: Standard Login Nutzer ist";
 
   // Page Login
   const char txt_login_title[] PROGMEM = "Authentifizierung";
   const char txt_login_password[] PROGMEM = "Passwort";
   const char txt_login_sucess[] PROGMEM = "Anmeldung erfolgreich, du wirst gleich weitergeleitet.";
   const char txt_login_fail[] PROGMEM = "Falscher/s Benutzername/Passwort! Erneut versuchen.";
-  const char txt_login_username[] PROGMEM = "Username";
-  const char txt_login_open_status[] PROGMEM = "Open status page";
-  const char txt_login_ph_user[] PROGMEM = "Enter username";
-  const char txt_login_ph_pwd[] PROGMEM = "Enter password";
+  const char txt_login_username[] PROGMEM = "Nuterzname";
+  const char txt_login_open_status[] PROGMEM = "Öffne Statusseite";
+  const char txt_login_ph_user[] PROGMEM = "Nutzername eingeben";
+  const char txt_login_ph_pwd[] PROGMEM = "Passwort eingeben";
 
   // Page Upgrade
   const char txt_upgrade_title[] PROGMEM = "Upgrade";
