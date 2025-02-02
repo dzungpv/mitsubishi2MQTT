@@ -46,19 +46,19 @@ jobs:
           mv .pio/build/ESP32DEV/firmware.bin mitsubishi2MQTT_ESP32DEV_PIO.bin
 
       - name: Upload esp8266 artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mitsubishi2MQTT_ESP8266-ESP01.bin
           path: ${{ github.workspace }}/app/mitsubishi2MQTT_ESP8266-ESP01.bin
 
       - name: Upload WEMOS_D1_Mini artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mitsubishi2MQTT_WEMOS_D1_Mini.bin
           path: ${{ github.workspace }}/app/mitsubishi2MQTT_WEMOS_D1_Mini.bin
 
       - name: Upload PIO esp32dev artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mitsubishi2MQTT_ESP32DEV_PIO.bin
           path: ${{ github.workspace }}/app/mitsubishi2MQTT_ESP32DEV_PIO.bin
@@ -74,7 +74,7 @@ jobs:
         run: |
           sudo mv ${{ github.workspace }}/app/build/mitsubishi2MQTT.bin ${{ github.workspace }}/app/build/mitsubishi2MQTT_ESP32DEV_IDF.bin
       - name: Upload ESP32DEV_IDF artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mitsubishi2MQTT_ESP32DEV_IDF.bin
           path: |
