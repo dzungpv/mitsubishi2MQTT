@@ -69,6 +69,8 @@ jobs:
           esp_idf_version: v4.4.6
           target: esp32
           path: app
+          command: apt-get update && apt-get install -y python3-venv && idf.py build
+          
       - name: Merge all bin file to one 
         run: |
            cd ${{ github.workspace }}/app/build && esptool.py --chip esp32 merge_bin -o mitsubishi2MQTT_ESP32DEV_IDF.bin --flash_mode dio --flash_freq 40m --flash_size 4MB 0x1000 bootloader/bootloader.bin 0x20000 mitsubishi2MQTT.bin 0xe000 partition_table/partition-table.bin 0x1d000 ota_data_initial.bin
