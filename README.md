@@ -89,9 +89,13 @@ Nightly builds are available for select platforms via GitHub Actions. Go to [the
 ***
 
 ## How to build code from source:
-  - ESP IDF (Recomended): clone the project with --recursive tag: ```git clone https://github.com/dzungpv/mitsubishi2MQTT.git --recursive```, Install [ESP IDF 4.4.6 ](https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/get-started/index.html) set the target and run command: idf.py build
+  - ESP IDF (Recomended): clone the project with --recursive tag: ```git clone https://github.com/dzungpv/mitsubishi2MQTT.git --recursive```, Install [ESP IDF 4.4.6 ](https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/get-started/index.html) set the target and run command to build: ```idf.py build```, flash to the chip with command: ```idf.py flash```
   - Arduino: Intall require libraries (name and path in platformio.ini), rename file main.cpp in main folder to main.ino, open it and build
   - Platformio: Install, open it and choose a variant to build
+
+## How to flash pre-build bin file (for ESP32 only):
+ - Download latest release bin file `mitsubishi2MQTT_ESP32DEV_IDF.bin.zip` and exact it.
+ - Flash `mitsubishi2MQTT_ESP32DEV_IDF.bin` with esptool.py with command: ```esptool.py -p PORT -b 460800 --before default_reset --after no_reset --chip esp32 write_flash --flash_mode dio --flash_size keep --flash_freq 40m 0x0 mitsubishi2MQTT_ESP32DEV_IDF.bin```
 
 ***
 
