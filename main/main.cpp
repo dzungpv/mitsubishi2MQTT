@@ -716,13 +716,13 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   doc["ap_pwd"] = apPwd;
   doc["hostname"] = hostName;
   doc["ota_pwd"] = otaPwd;
-  if (!local_ip.isEmpty() && !gw_ip.isEmpty() && !subnet_ip.isEmpty()) {
-    doc["static_ip"] = local_ip;
-    doc["static_gw_ip"] = gw_ip;
-    doc["static_subnet"] = subnet_ip;
-    if (!dns_ip.isEmpty()) {
-      doc["static_dns_ip"] = dns_ip;
-    }
+  if (!local_ip.isEmpty() && local_ip.length() > 6 && !gw_ip.isEmpty() && gw_ip.length() > 6 && !subnet_ip.isEmpty() && subnet_ip.length() > 6) {
+      doc["static_ip"] = local_ip;
+      doc["static_gw_ip"] = gw_ip;
+      doc["static_subnet"] = subnet_ip;
+      if (!dns_ip.isEmpty() && dns_ip.length() > 6) {
+          doc["static_dns_ip"] = dns_ip;
+      }
   }
   File configFile = SPIFFS.open(wifi_conf, "w");
   if (!configFile)
@@ -1143,6 +1143,10 @@ void handleInitSetup(AsyncWebServerRequest *request)
   {
     initSetupPage.replace(F("_WIFI_OPTIONS_"), wifiOptions);
   }
+  initSetupPage.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
+  initSetupPage.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
+  initSetupPage.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
+  initSetupPage.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
   initSetupPage.replace(F("_FRIENDLY_NAME_"), mqtt_fn);
   initSetupPage.replace(F("_MQTT_HOST_"), mqtt_server);
   initSetupPage.replace(F("_MQTT_PORT_"), String(mqtt_port));

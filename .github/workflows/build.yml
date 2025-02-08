@@ -66,7 +66,7 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v4.4.8
+          esp_idf_version: v4.4.6
           target: esp32
           path: app
           command: apt-get update && apt-get install -y python3-venv && idf.py build && cd build && esptool.py --chip esp32 merge_bin -o mitsubishi2MQTT_ESP32DEV_IDF.bin @flash_args
