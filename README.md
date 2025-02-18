@@ -77,7 +77,7 @@ Faulty handling may cause leakage of water, electric shock or fire! :warning:
 ## How to use:
  - Step 1: Flash the sketch with flash size include SPIFFS option.
  - Step 2: Connect to device AP with name HVAC-XXXXXXXXXXXX (XXXX... 12 character MAC address)
- - Step 3: You should be automatically redirected to the web portal or go to 192.168.4.1
+ - Step 3: You should be automatically redirected to the web portal or go to 192.168.4.1 or 8.8.8.8 (version later than 2025.02.08)
  - Step 4: Set Wifi information, mqtt(optional), language and save & reboot. Fall back to AP mode if WiFi connection fails (AP password sets to default SSID name from step 2).
  - Step 5: Connect to the device I with local domain: HVAC-XXXXXXXXXXXX.local
  - Step 6: (optional): Set MQTT information for use with Home Assistant
@@ -96,6 +96,7 @@ Nightly builds are available for select platforms via GitHub Actions. Go to [the
 ## How to flash pre-build bin file (for ESP32 only):
  - Download latest release bin file `mitsubishi2MQTT_ESP32DEV_IDF.bin.zip` and exact it.
  - Flash `mitsubishi2MQTT_ESP32DEV_IDF.bin` with esptool.py with command: ```esptool.py -p PORT -b 460800 --before default_reset --after no_reset --chip esp32 write_flash --flash_mode dio --flash_size keep --flash_freq 40m 0x0 mitsubishi2MQTT_ESP32DEV_IDF.bin```
+ - If you do not want to install EspTool, just use EspTool web with Chrome or Edge browser here: https://espressif.github.io/esptool-js/, after connected, choose file: `mitsubishi2MQTT_ESP32DEV_IDF.bin` and then enter `Flash Address` 0x0 and press `Program`.
 
 ***
 

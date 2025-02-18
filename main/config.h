@@ -113,7 +113,7 @@ Ticker ticker;
 
 // Captive portal variables, only used for config page
 const byte DNS_PORT = 53;
-IPAddress apIP(192, 168, 4, 1);
+IPAddress apIP(8, 8, 8, 8);
 IPAddress netMsk(255, 255, 255, 0);
 DNSServer dnsServer;
 
