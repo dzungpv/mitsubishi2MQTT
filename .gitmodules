@@ -4,17 +4,17 @@
 	branch = release/v2.x
 [submodule "components/ESPAsyncWebServer"]
 	path = components/ESPAsyncWebServer
-	url = https://github.com/dzungpv/ESPAsyncWebServer.git
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
 [submodule "components/AsyncTCP"]
 	path = components/AsyncTCP
-	url = https://github.com/dzungpv/AsyncTCP.git
+	url = https://github.com/me-no-dev/AsyncTCP.git
 [submodule "components/HeatPump"]
 	path = components/HeatPump
-	url = https://github.com/dzungpv/HeatPump.git
+	url = https://github.com/SwiCago/HeatPump.git
 [submodule "components/ArduinoJson"]
 	path = components/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
 	branch = 6.x
 [submodule "components/espMqttClient"]
 	path = components/espMqttClient
-	url = https://github.com/dzungpv/espMqttClient.git
+	url = https://github.com/bertmelis/espMqttClient.git
