@@ -236,7 +236,7 @@ void setup()
     if (!isSecureEnable())
     {
       server.on("/upgrade", handleUpgrade);
-      server.on("/upload", HTTP_ASYNC_ANY, handleUploadDone, handleUploadLoop);
+      server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
       Update.onProgress(otaUpdateProgress);
 #endif
@@ -796,7 +796,7 @@ void initCaptivePortal()
   if (!isSecureEnable())
   {
     server.on("/upgrade", handleUpgrade);
-    server.on("/upload", HTTP_ASYNC_ANY, handleUploadDone, handleUploadLoop);
+    server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
     Update.onProgress(otaUpdateProgress);
 #endif
