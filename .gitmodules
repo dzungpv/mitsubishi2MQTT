@@ -11,10 +11,10 @@
 [submodule "components/HeatPump"]
 	path = components/HeatPump
 	url = https://github.com/SwiCago/HeatPump.git
+[submodule "components/espMqttClient"]
+	path = components/espMqttClient
+	url = https://github.com/bertmelis/espMqttClient.git
 [submodule "components/ArduinoJson"]
 	path = components/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
 	branch = 6.x
-[submodule "components/espMqttClient"]
-	path = components/espMqttClient
-	url = https://github.com/bertmelis/espMqttClient.git
