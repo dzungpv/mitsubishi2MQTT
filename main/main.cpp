@@ -2905,6 +2905,7 @@ void haConfigClimate()
   haConfig["temp_step"] = temp_step;
   haConfig["temperature_unit"] = useFahrenheit ? "F" : "C";
 
+  // fan control
   JsonArray haConfigFan_modes = haConfig.createNestedArray("fan_modes");
   haConfigFan_modes.add("auto");  //AUTO
   haConfigFan_modes.add("diffuse"); //QUIET
@@ -2917,6 +2918,7 @@ void haConfigClimate()
   haConfig["fan_mode_stat_t"] = ha_state_topic;
   haConfig["fan_mode_stat_tpl"] = F("{{ value_json.fan if (value_json is defined and value_json.fan is defined and value_json.fan|length) else 'auto' }}"); // Set default value for fix "Could not parse data for HA"
 
+  // vertical swing mode control
   JsonArray haConfigSwing_modes = haConfig.createNestedArray("swing_modes");
   haConfigSwing_modes.add("AUTO");
   haConfigSwing_modes.add("1");
@@ -2929,6 +2931,22 @@ void haConfigClimate()
   haConfig[F("swing_mode_cmd_t")] = ha_vane_set_topic;
   haConfig["swing_mode_stat_t"] = ha_state_topic;
   haConfig["swing_mode_stat_tpl"] = F("{{ value_json.vane if (value_json is defined and value_json.vane is defined and value_json.vane|length) else 'AUTO' }}"); // Set default value for fix "Could not parse data for HA"
+
+  // horizontal swing mode control
+  JsonArray haConfigSwing_H_modes = haConfig.createNestedArray("swing_h_modes");
+  haConfigSwing_H_modes.add("<<");
+  haConfigSwing_H_modes.add("<");
+  haConfigSwing_H_modes.add("|");
+  haConfigSwing_H_modes.add(">");
+  haConfigSwing_H_modes.add(">>");
+  haConfigSwing_H_modes.add("<>");
+  haConfigSwing_H_modes.add("SWING");
+
+  haConfig[F("swing_h_mode_cmd_t")] = ha_wide_vane_set_topic;
+  haConfig["swing_h_mode_stat_t"] = ha_state_topic;
+  haConfig["swing_h_mode_stat_tpl"] = F("{{ value_json.wideVane if (value_json is defined and value_json.wideVane is defined and value_json.wideVane|length) else 'SWING' }}"); // Set default value for fix "Could not parse data for HA"
+
+  // action control topic
   haConfig["action_topic"] = ha_state_topic;
   haConfig["action_template"] = F("{{ value_json.action if (value_json is defined and value_json.action is defined and value_json.action|length) else 'idle' }}"); // Set default value for fix "Could not parse data for HA"
 
