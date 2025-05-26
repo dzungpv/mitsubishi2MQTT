@@ -2769,6 +2769,7 @@ void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = 
   else if (tag_id == ENT_FREE_HEAP)
   {
     haConfig["unit_of_meas"] = unit;
+    haConfig["sug_dsp_prc"] = 0;
     haConfig["stat_t"] = ha_system_setting_info;
   }
   else if (tag_id == ENT_RSSI)
@@ -2848,7 +2849,9 @@ void sendDeviceInfo()
   uint32_t totalHeapBytes = 64000;
 #endif
   // we round to 0.5 (half) to avoid continue changes
-  float percentageHeapFree = 0.5 * round(2.0*(freeHeapBytes * 100.0f / (float)totalHeapBytes));
+  //float percentageHeapFree = 0.5 * round(2.0*(freeHeapBytes * 100.0f / (float)totalHeapBytes));
+  // we round to avoid continue changes
+  float percentageHeapFree = round(freeHeapBytes * 100.0f / (float)totalHeapBytes);
   String heap(percentageHeapFree);
   haConfigInfo[getEntityTag(ENT_FREE_HEAP)] = heap;
   // get wifi rssi
@@ -3565,7 +3568,14 @@ time_t getUpTimeSeconds()
 {
   time_t now;
 
+  if (device_boot_time > 0)
+    return device_boot_time;
+
   time(&now);
+  // if system time still not set via NTP, we return 0
+  if (now < min_valid_date)
+    return 0;
+
   // Set timezone to Vietnam Standard Time
   setenv("TZ", timezone.c_str(), 1);
   tzset();
@@ -3578,9 +3588,9 @@ time_t getUpTimeSeconds()
   int32_t secondsSinceBoot = milliSecondsSinceBoot / 1000;
 #endif
 
-  now -= secondsSinceBoot;
+  device_boot_time = now - secondsSinceBoot;
 
-  return now;
+  return device_boot_time;
 }
 
 // Time device running without crash or reboot

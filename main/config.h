@@ -203,6 +203,8 @@ String wifi_static_dns_ip;
 String ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
+const time_t min_valid_date = 1000000;  // min time to consider device date valid
+time_t device_boot_time = 0;
 
 // Define global variables for MQTT
 String mqtt_fn;
