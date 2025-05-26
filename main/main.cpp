@@ -108,8 +108,9 @@ bool isSecureEnable();
 String getBuildDatetime();
 String getAppVersion();
 void initNVS();
-String getUpTime();
 String getCurrentTime();
+time_t getUpTimeSeconds();
+String getUpTime();
 void tick(); // led blink tick
 void factoryReset();
 void otaUpdateProgress(size_t prg, size_t sz);
@@ -195,11 +196,13 @@ void setup()
     ha_system_set_topic = mqtt_topic + "/" + mqtt_fn + "/system/set"; // for control over mqtt
     if (others_haa)
     {
-      ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
+      //ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
+      ha_config_topic = others_haa_topic + "/climate/hvac_" + getId() + "/config";
     }
     else
     {
-      ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
+      //ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
+      ha_config_topic = "homeassistant/climate//hvac_" + getId() + "/config";
     }
     // startup mqtt connection
     initMqtt();
@@ -2621,170 +2624,211 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
   delete[] message;
 }
 
-void haConfigTemp(String tag, String icon) {
-  // send HA config packet for tempearature sensor
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
-  DynamicJsonDocument haConfig(capacity);
+String getEntityTag(byte tag_id)
+{
+  switch (tag_id)
+  {
+  case ENT_ROOM_TEMPERATURE:
+    return F("roomTemperature");
+    break;
+  case ENT_COMPR_FRQ:
+    return F("compressorFreq");
+    break;
+  case ENT_CONNECTION_STATE:
+    return F("connection_state");
+    break;
+  case ENT_UP_TIME:
+    return F("up_time");
+    break;
+  case ENT_FREE_HEAP:
+    return F("free_heap");
+    break;
+  case ENT_RSSI:
+    return F("rssi");
+    break;
+  case ENT_BSSI:
+    return F("bssi");
+    break;
+  case ENT_RESTART_BTN:
+    return F("restart");
+    break;
+  
+  default:
+    return F("unknown");
+    break;
+  }
+}
 
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  haConfig["unique_id"] = String("hvac_") + getId() + "_" + tag;
+String getEntityName(byte tag_id)
+{
+  switch (tag_id)
+  {
+  case ENT_ROOM_TEMPERATURE:
+    return F("Room temperature");
+    break;
+  case ENT_COMPR_FRQ:
+    return F("Compressor frequency");
+    break;
+  case ENT_CONNECTION_STATE:
+    return F("Connection state");
+    break;
+  case ENT_UP_TIME:
+    return F("Up time");
+    break;
+  case ENT_FREE_HEAP:
+    return F("Free heap");
+    break;
+  case ENT_RSSI:
+    return F("RSSI");
+    break;
+  case ENT_BSSI:
+    return F("BSSI");
+    break;
+  case ENT_RESTART_BTN:
+    return F("Restart");
+    break;
+  
+  default:
+    return F("Unknown");
+    break;
+  }
+}
 
-  haConfig["dev_cla"] = "temperature";
-  haConfig["stat_t"] = ha_state_topic;
-  haConfig["unit_of_meas"] = useFahrenheit ? "°F" : "°C";
-  haConfig["val_tpl"] = "{{value_json." + tag + "}}";
+void haConfigureDevice(DynamicJsonDocument &haConfig)
+{
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 50;
+  DynamicJsonDocument haConnInfo(capacity);  
 
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
-  haConfigDevice["ids"] = mqtt_fn;
+  String dev_id = getId();
+
+  // device info object
+  JsonObject haConfigDevice = haConfig.createNestedObject("dev");
+  
+  // identifiers array
+  haConfigDevice.createNestedArray("ids")[0] = mqtt_fn + "_" + dev_id;
+
+  // connection info (mac)
+  haConnInfo.createNestedArray();
+  haConnInfo[0] = "mac";
+  haConnInfo[1] = dev_id;
+  haConfigDevice.createNestedArray("cns")[0] = haConnInfo;
+
+  // other device infos
   haConfigDevice["name"] = mqtt_fn;
   haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
   haConfigDevice["mdl"] = model;
   haConfigDevice["mf"] = manufacturer;
   haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
 
-  String mqttOutput;
-  serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
+  // availability topic
+  haConfig["avty_t"] = ha_availability_topic;
+  haConfig["pl_avail"] = mqtt_payload_available;       // MQTT online message payload
+  haConfig["pl_not_avail"] = mqtt_payload_unavailable; // MQTT offline message payload
 }
 
-void haConfigFreq(String tag, String unit, String icon) {
-  // send HA config packet for freq sensor
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
-  DynamicJsonDocument haConfig(capacity);
-
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  haConfig["unique_id"] = getId() + "_" + tag;
-
-  haConfig["dev_cla"] = "frequency";
-  haConfig["stat_t"] = ha_state_topic;
-  haConfig["unit_of_meas"] = unit;
-  haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
-
-  String mqttOutput;
-  serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
-}
-
-void haConfigSensor(String tag, String unit, String icon)
+void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = false)
 {
   // send HA config packet for up time
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
   DynamicJsonDocument haConfig(capacity);
 
   haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  // clean string
-  tag.replace(" ", "_");
-  tag.toLowerCase();
-  //
+  haConfig["name"] = getEntityName(tag_id);
+  
+  // Set unique ID and value template
+  String tag = getEntityTag(tag_id);
   haConfig["unique_id"] = getId() + "_" + tag;
-  if (strcmp(tag.c_str(), "connection_state") == 0)
+  haConfig["val_tpl"] = "{{ value_json." + tag + " }}";
+
+  if (tag_id == ENT_ROOM_TEMPERATURE)
+  {
+    haConfig["dev_cla"] = "temperature";
+    haConfig["unit_of_meas"] = useFahrenheit ? "°F" : "°C";
+    haConfig["stat_t"] = ha_state_topic;
+  }
+  else if (tag_id == ENT_COMPR_FRQ)
+  {
+    haConfig["dev_cla"] = "frequency";
+    haConfig["unit_of_meas"] = unit;
+    haConfig["stat_t"] = ha_state_topic;
+  }
+  else if (tag_id == ENT_CONNECTION_STATE)
   {
     haConfig["dev_cla"] = "connectivity";
-    haConfig["entity_category"] = "diagnostic";
     haConfig["payload_on"] = "online";
     haConfig["payload_off"] = "offline";
     haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["val_tpl"] = "{{ value_json.connection_state }}";
   }
-  else if (strcmp(tag.c_str(), "up_time") == 0)
+  else if (tag_id == ENT_UP_TIME)
   {
-    // haConfig["dev_cla"] = "timestamp";
-    haConfig["stat_t"] = ha_system_setting_info;
+    haConfig["dev_cla"] = "timestamp";
+    haConfig["val_tpl"] = "{{ as_datetime(value_json." + tag + ") }}";
     // haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-    haConfig["entity_category"] = "diagnostic";
-  }
-  else if (strcmp(tag.c_str(), "free_heap") == 0)
-  {
-    haConfig["entity_category"] = "diagnostic";
     haConfig["stat_t"] = ha_system_setting_info;
+  }
+  else if (tag_id == ENT_FREE_HEAP)
+  {
     haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-  }
-  else if (strcmp(tag.c_str(), "rssi") == 0)
-  {
-    haConfig["entity_category"] = "diagnostic";
     haConfig["stat_t"] = ha_system_setting_info;
+  }
+  else if (tag_id == ENT_RSSI)
+  {
     haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-  }
-  else if (strcmp(tag.c_str(), "bssi") == 0)
-  {
-    haConfig["entity_category"] = "diagnostic";
     haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
+  }
+  else if (tag_id == ENT_BSSI)
+  {
+    haConfig["stat_t"] = ha_system_setting_info;
   }
 
-  JsonObject haConfigDevice = haConfig["device"].to<JsonObject>();
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = getAppVersion();
-  // haConfigDevice["sn"] = getId();
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
+  if (is_diagnostic)
+    haConfig["ent_cat"] = "diagnostic";
 
+  // add device info
+  haConfigureDevice(haConfig);
+  
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor;
-  if (strcmp(tag.c_str(), "connection_state") == 0)
+
+  String ha_entity_type;
+  if (tag_id == ENT_CONNECTION_STATE)
   {
-    ha_config_topic_sensor = "homeassistant/binary_sensor/hvac_" + getId() + "_" + tag + "/config";
+    ha_entity_type = "binary_sensor";
   }
   else
   {
-    ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
+    ha_entity_type = "sensor";
   }
+
+  String ha_config_topic_sensor;
+  ha_config_topic_sensor = "homeassistant/" + ha_entity_type + "/hvac_" + getId() + "/" + tag + "/config";
   mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
 }
 
-void haConfigButton(String tag, String payload_press, String icon)
+void haConfigButton(byte tag_id, String payload_press, String icon)
 {
   // send HA config packet for button
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
   DynamicJsonDocument haConfig(capacity);
 
   haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  // clean string
-  tag.replace(" ", "_");
-  tag.toLowerCase();
-  //
+  haConfig["name"] = getEntityName(tag_id);
+  
+  // Set unique ID and value template
+  String tag = getEntityTag(tag_id);
   haConfig["unique_id"] = getId() + "_" + tag;
-  if (strcmp(payload_press.c_str(), "restart") == 0)
-  {
-    haConfig["dev_cla"] = "restart";
-  }
-  haConfig["command_topic"] = ha_system_set_topic;
-  haConfig["entity_category"] = "diagnostic";
+
+  haConfig["dev_cla"] = payload_press;
   haConfig["payload_press"] = payload_press; //"restart", "factory", "upgrade" ;
-
-  JsonObject haConfigDevice = haConfig["device"].to<JsonObject>();
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
+  haConfig["command_topic"] = ha_system_set_topic;
+  haConfig["ent_cat"] = "config";
+  
+  // add device info
+  haConfigureDevice(haConfig);
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_button = "homeassistant/button/" + getId() + "/" + tag + "/config";
+  String ha_config_topic_button = "homeassistant/button/hvac_" + getId() + "/" + tag + "/config";
   mqttClient->publish(ha_config_topic_button.c_str(), 1, true, mqttOutput.c_str());
 }
 
@@ -2794,7 +2838,7 @@ void sendDeviceInfo()
   const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
   DynamicJsonDocument haConfigInfo(capacity);
 
-  haConfigInfo["connection_state"] = hp.isConnected() ? "online" : "offline";
+  haConfigInfo[getEntityTag(ENT_CONNECTION_STATE)] = hp.isConnected() ? "online" : "offline";
   // get free heap in percent
 #ifdef ESP32
   uint32_t freeHeapBytes = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
@@ -2803,19 +2847,21 @@ void sendDeviceInfo()
   uint32_t freeHeapBytes = ESP.getFreeHeap();
   uint32_t totalHeapBytes = 64000;
 #endif
-  float percentageHeapFree = freeHeapBytes * 100.0f / (float)totalHeapBytes;
+  // we round to 0.5 (half) to avoid continue changes
+  float percentageHeapFree = 0.5 * round(2.0*(freeHeapBytes * 100.0f / (float)totalHeapBytes));
   String heap(percentageHeapFree);
-  haConfigInfo["free_heap"] = heap;
+  haConfigInfo[getEntityTag(ENT_FREE_HEAP)] = heap;
   // get wifi rssi
-  haConfigInfo["rssi"] = String(WiFi.RSSI());
-  haConfigInfo["bssi"] = getWifiBSSID();
-  haConfigInfo["up_time"] = getUpTime();
+  haConfigInfo[getEntityTag(ENT_RSSI)] = String(WiFi.RSSI());
+  haConfigInfo[getEntityTag(ENT_BSSI)] = getWifiBSSID();
+  haConfigInfo[getEntityTag(ENT_UP_TIME)] = getUpTimeSeconds();
+
   String mqttOutput;
   serializeJson(haConfigInfo, mqttOutput);
   mqttClient->publish(ha_system_setting_info.c_str(), 1, false, mqttOutput.c_str());
 }
 
-void sendHaConfig()
+void haConfigClimate()
 {
 
   // send HA config packet
@@ -2843,9 +2889,7 @@ void sendHaConfig()
   haConfig["temp_cmd_t"] = ha_temp_set_topic;
   haConfig["temp_stat_t"] = ha_state_topic;
   haConfig["pow_cmd_t"] = ha_power_set_topic;
-  haConfig["avty_t"] = ha_availability_topic;          // MQTT last will (status) messages topic
-  haConfig["pl_not_avail"] = mqtt_payload_unavailable; // MQTT offline message payload
-  haConfig["pl_avail"] = mqtt_payload_available;       // MQTT online message payload
+
   // Set default value for fix "Could not parse data for HA"
   String temp_stat_tpl_str = F("{% if (value_json is defined and value_json.temperature is defined) %}{% if (value_json.temperature|int >= ");
   temp_stat_tpl_str += (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + " and value_json.temperature|int <= ";
@@ -2869,7 +2913,6 @@ void sendHaConfig()
   haConfigFan_modes.add("middle"); //3 native
   haConfigFan_modes.add("high"); //4 native
 
-
   haConfig["fan_mode_cmd_t"] = ha_fan_set_topic;
   haConfig["fan_mode_stat_t"] = ha_state_topic;
   haConfig["fan_mode_stat_tpl"] = F("{{ value_json.fan if (value_json is defined and value_json.fan is defined and value_json.fan|length) else 'auto' }}"); // Set default value for fix "Could not parse data for HA"
@@ -2883,37 +2926,38 @@ void sendHaConfig()
   haConfigSwing_modes.add("5");
   haConfigSwing_modes.add("SWING");
 
-  haConfig["swing_mode_cmd_t"] = ha_vane_set_topic;
+  haConfig[F("swing_mode_cmd_t")] = ha_vane_set_topic;
   haConfig["swing_mode_stat_t"] = ha_state_topic;
   haConfig["swing_mode_stat_tpl"] = F("{{ value_json.vane if (value_json is defined and value_json.vane is defined and value_json.vane|length) else 'AUTO' }}"); // Set default value for fix "Could not parse data for HA"
   haConfig["action_topic"] = ha_state_topic;
   haConfig["action_template"] = F("{{ value_json.action if (value_json is defined and value_json.action is defined and value_json.action|length) else 'idle' }}"); // Set default value for fix "Could not parse data for HA"
 
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
-
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-  haConfigDevice["configuration_url"] = "http://" + WiFi.localIP().toString();
+  // add device info
+  haConfigureDevice(haConfig);
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
+}
+
+void sendHaConfig()
+{
+  // Climate
+  haConfigClimate();
+
   // Button
-  haConfigButton("Restart", "restart", "mdi:restart");
+  haConfigButton(ENT_RESTART_BTN, "restart", "mdi:restart");
   // Temperature sensors
-  haConfigTemp("roomTemperature", "mdi:thermometer");
+  haConfigSensor(ENT_ROOM_TEMPERATURE, "", "mdi:thermometer");
   // Freq sensor
-  haConfigFreq("compressorFreq", "Hz", "mdi:sine-wave");
+  haConfigSensor(ENT_COMPR_FRQ, "Hz", "mdi:sine-wave");
   // Up time
-  haConfigSensor("Up Time", "", "mdi:clock");
+  haConfigSensor(ENT_UP_TIME, "", "mdi:clock", true);
   // HVAC connection state
-  haConfigSensor("Connection state", "", "mdi:check-network");
-  haConfigSensor("Free Heap", "%", "mdi:memory");
-  haConfigSensor("RSSI", "dBm", "mdi:network-strength-1");
-  haConfigSensor("BSSI", "", "mdi:router-wireless");
+  haConfigSensor(ENT_CONNECTION_STATE, "", "mdi:check-network", true);
+  haConfigSensor(ENT_FREE_HEAP, "%", "mdi:memory", true);
+  haConfigSensor(ENT_RSSI, "dBm", "mdi:network-strength-1", true);
+  haConfigSensor(ENT_BSSI, "", "mdi:router-wireless", true);
 }
 
 void mqttConnect()
@@ -3499,10 +3543,15 @@ String getCurrentTime()
   return String(strftime_buf);
 }
 
-// Time device running without crash or reboot
-String getUpTime()
+time_t getUpTimeSeconds()
 {
-  char uptimeBuffer[64];
+  time_t now;
+
+  time(&now);
+  // Set timezone to Vietnam Standard Time
+  setenv("TZ", timezone.c_str(), 1);
+  tzset();
+
 #ifdef ESP32
   int64_t microSecondsSinceBoot = esp_timer_get_time();
   int64_t secondsSinceBoot = microSecondsSinceBoot / 1000000;
@@ -3510,12 +3559,23 @@ String getUpTime()
   int32_t milliSecondsSinceBoot = millis(); // 2^32-1 only about 49 day before roll over
   int32_t secondsSinceBoot = milliSecondsSinceBoot / 1000;
 #endif
-  int seconds = (secondsSinceBoot % 60);
-  int minutes = (secondsSinceBoot % 3600) / 60;
-  int hours = (secondsSinceBoot % 86400) / 3600;
-  int days = (secondsSinceBoot % (86400 * 30)) / 86400;
-  sprintf(uptimeBuffer, "%02i:%02i:%02i:%02i", days, hours, minutes, seconds);
-  return String(uptimeBuffer);
+
+  now -= secondsSinceBoot;
+
+  return now;
+}
+
+// Time device running without crash or reboot
+String getUpTime()
+{
+  char strftime_buf[64];
+  struct tm timeinfo;
+
+  time_t uptime = getUpTimeSeconds();
+
+  localtime_r(&uptime, &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  return String(strftime_buf);
 }
 
 #ifdef ESP32
