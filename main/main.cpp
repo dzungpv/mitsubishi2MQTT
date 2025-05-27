@@ -3124,16 +3124,17 @@ String getTemperatureScale()
   }
 }
 
-String getId()
-{
+String getId() {
 #ifdef ESP32
-  char chipID[23];
-  snprintf(chipID, 23, "%llX", ESP.getEfuseMac());
-  return String(chipID);
+    unsigned char mac_base[6] = {0};
+    esp_read_mac(mac_base, ESP_MAC_WIFI_STA);
+    char chipID[14];
+    snprintf(chipID, 13, "%02X%02X%02X%02X%02X%02X", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5]);
+    return String(chipID);
 #else
-  String chipID = WiFi.macAddress();
-  chipID.replace(":", "");
-  return chipID;
+    String chipID = WiFi.macAddress();
+    chipID.replace(":", "");
+    return chipID;
 #endif
 }
 
