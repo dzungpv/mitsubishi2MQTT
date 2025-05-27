@@ -196,13 +196,11 @@ void setup()
     ha_system_set_topic = mqtt_topic + "/" + mqtt_fn + "/system/set"; // for control over mqtt
     if (others_haa)
     {
-      //ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
-      ha_config_topic = others_haa_topic + "/climate/hvac_" + getId() + "/config";
+      ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
     }
     else
     {
-      //ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
-      ha_config_topic = "homeassistant/climate//hvac_" + getId() + "/config";
+      ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
     }
     // startup mqtt connection
     initMqtt();
