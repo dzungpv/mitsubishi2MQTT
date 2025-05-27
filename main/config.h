@@ -203,6 +203,8 @@ String wifi_static_dns_ip;
 String ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
+const time_t min_valid_date = 1000000;  // min time to consider device date valid
+time_t device_boot_time = 0;
 
 // Define global variables for MQTT
 String mqtt_fn;
@@ -324,6 +326,15 @@ const char *const language_names[] = {
     "Català"
 };
 #endif
+
+const byte ENT_ROOM_TEMPERATURE = 0;
+const byte ENT_COMPR_FRQ = 1;
+const byte ENT_CONNECTION_STATE = 2;
+const byte ENT_UP_TIME = 3;
+const byte ENT_FREE_HEAP = 4;
+const byte ENT_RSSI = 5;
+const byte ENT_BSSI = 6;
+const byte ENT_RESTART_BTN = 10;
 
 static constexpr uint8_t NUM_LANGUAGES = sizeof(languages) / sizeof(const char *);
 
