@@ -199,6 +199,9 @@ String wifi_static_gateway_ip;
 String wifi_static_subnet;
 String wifi_static_dns_ip;
 
+// HTML Response
+String html_response;
+
 // time and time zone
 String ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
