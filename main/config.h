@@ -200,7 +200,8 @@ String wifi_static_subnet;
 String wifi_static_dns_ip;
 
 // HTML Response
-String html_response;
+char* html_response = NULL;
+unsigned int html_resp_length = 0;
 
 // time and time zone
 String ntpServer = "pool.ntp.org";

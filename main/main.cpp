@@ -646,7 +646,7 @@ void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const Stri
   if (mqttTopic.isEmpty())
   {
     // set default topic
-    mqttTopic += getId();
+    mqttTopic += mqtt_topic; //getId();
     mqttTopic.toLowerCase();
   }
   doc["mqtt_fn"] = mqttFn;
@@ -991,50 +991,46 @@ boolean initWifi()
 
 // Handler webserver response
 
-/*
-void sendChunkedResponse(AsyncWebServerRequest *request, const String &content)
+void sendChunkedResponse(AsyncWebServerRequest *request, const String &to_send)
 {
-  html_response = content; // save response to global buffer variable
-  
-  static int max_chunk_size = 2000;
-  static const char *htmlContent = html_response.c_str(); 
-  static const size_t htmlContentLength = strlen_P(htmlContent);
-  String etag = String(htmlContentLength);
+  if (to_send.isEmpty())
+    return;
 
+  html_resp_length = to_send.length();
+  html_response = new char[html_resp_length + 1];
+  memcpy(html_response, to_send.c_str(), html_resp_length);
+  html_response[html_resp_length] = '\0';
+
+  static const int max_chunk_size = 1000;
+  
   AsyncWebServerResponse *response = request->beginChunkedResponse("text/html", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     // finished ?
-    if (htmlContentLength <= index) {
-      //html_response.clear(); // cleanup memory when send completed
+    if (html_resp_length <= index) {
+      if (html_response != NULL) {
+        delete[] html_response; // cleanup memory when send completed
+        html_response = NULL;
+      }
       return 0;
     }
 
-    // serve a maximum of 256 or maxLen bytes of the remaining content
-    // this small number is specifically chosen to demonstrate the chunking
-    // DO NOT USE SUCH SMALL NUMBER IN PRODUCTION
-    // Reducing the chunk size will increase the response time, thus reducing the server's capacity in processing concurrent requests
-    const int chunkSize = min((size_t)max_chunk_size, min(maxLen, htmlContentLength - index));
-    memcpy(buffer, htmlContent + index, chunkSize);
-
-    return chunkSize;
+    size_t len = min((size_t)max_chunk_size, min(maxLen, html_resp_length - index));
+    memcpy(buffer, html_response + index, len);
+    return len;
   });
 
-  response->addHeader(asyncsrv::T_ETag, etag);
   request->send(response);
 }
-*/
 
 void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
 {
-  html_response.clear();
-  html_response = FPSTR(html_common_header);
-  html_response += content;
-  html_response += FPSTR(html_common_footer);
-  html_response.replace(F("_UNIT_NAME_"), hostname);
-  html_response.replace(F("_VERSION_"), getAppVersion());
-  html_response.replace(F("_APP_NAME_"), appName);
+  String to_send = FPSTR(html_common_header);
+  to_send += content;
+  to_send += FPSTR(html_common_footer);
+  to_send.replace(F("_UNIT_NAME_"), hostname);
+  to_send.replace(F("_VERSION_"), getAppVersion());
+  to_send.replace(F("_APP_NAME_"), appName);
 
-  request->send_P(200, "text/html", html_response.c_str());
-  //sendChunkedResponse(request, toSend);
+  sendChunkedResponse(request, to_send);
 }
 
 void handleNotFound(AsyncWebServerRequest *request)
@@ -2893,7 +2889,7 @@ void haConfigClimate()
 
   // send HA config packet
   // setup HA payload device
-  const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2048;
+  const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + 2 * JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2500;
   DynamicJsonDocument haConfig(capacity);
 
   haConfig[F("name")] = nullptr;
