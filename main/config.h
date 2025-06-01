@@ -243,10 +243,10 @@ String ha_debug_pckts_topic;
 String ha_debug_pckts_set_topic;
 String ha_debug_logs_topic;
 String ha_debug_logs_set_topic;
-String ha_config_topic;
 String ha_discovery_topic;
 String ha_custom_packet;
 String ha_availability_topic;
+String ha_birth_topic;
 String hvac_name;
 
 // login

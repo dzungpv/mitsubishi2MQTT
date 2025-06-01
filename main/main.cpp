@@ -196,14 +196,7 @@ void setup()
     ha_custom_packet = mqtt_topic + "/" + mqtt_fn + "/custom/send";
     ha_availability_topic = mqtt_topic + "/" + mqtt_fn + "/availability";
     ha_system_set_topic = mqtt_topic + "/" + mqtt_fn + "/system/set"; // for control over mqtt
-    if (others_haa)
-    {
-      ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
-    }
-    else
-    {
-      ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
-    }
+    ha_birth_topic = (others_haa ? others_haa_topic : "homeassistant") + "/status";
     // startup mqtt connection
     initMqtt();
   }
@@ -1665,7 +1658,6 @@ void handleControl(AsyncWebServerRequest *request)
     controlPage.replace(F("_FAN_4_"), F("selected"));
   }
 
-  controlPage.replace(F("_VANE_V_"), settings.vane);
   if (strcmp(settings.vane, "AUTO") == 0)
   {
     controlPage.replace(F("_VANE_A_"), F("selected"));
@@ -1695,7 +1687,6 @@ void handleControl(AsyncWebServerRequest *request)
     controlPage.replace(F("_VANE_S_"), F("selected"));
   }
 
-  controlPage.replace(F("_WIDEVANE_V_"), settings.wideVane);
   if (strcmp(settings.wideVane, "<<") == 0)
   {
     controlPage.replace(F("_WVANE_1_"), F("selected"));
@@ -2352,9 +2343,9 @@ void hpCheckRemoteTemp()
   }
 }
 
-void sendKeepAlive()
+void sendKeepAlive(bool force = false)
 {
-  if (millis() - lastAliveMsgSend < SEND_ALIVE_MSG_INTERVAL_MS)
+  if ((millis() - lastAliveMsgSend < SEND_ALIVE_MSG_INTERVAL_MS) && !force)
   {
     return;
   }
@@ -2601,6 +2592,11 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
       factoryReset();
     }
   }
+  else if (strcmp(topic, ha_birth_topic.c_str()) == 0)
+  { // We receive birth topic from ha
+    if (strcmp(message, mqtt_payload_available) == 0)
+      sendKeepAlive(true);
+  }
   else if (strcmp(topic, ha_custom_packet.c_str()) == 0)
   { // send custom packet for advance user
     String custom = message;
@@ -2718,6 +2714,18 @@ String getEntityName(byte tag_id)
   }
 }
 
+String haGetConfigTopic(String entity_type, String topic_id = "", String entity_tag = "")
+{
+  String ha_topic;
+
+  ha_topic = (others_haa ? others_haa_topic : "homeassistant")  + "/" + entity_type + "/";
+  ha_topic += (topic_id.isEmpty() ? mqtt_fn : topic_id) + "/";
+  if (!entity_tag.isEmpty())
+    ha_topic += entity_tag + "/";
+  ha_topic += "config";
+  return ha_topic;
+}
+
 void haConfigureDevice(DynamicJsonDocument &haConfig)
 {
   const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 50;
@@ -2825,9 +2833,8 @@ void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = 
     ha_entity_type = F("sensor");
   }
 
-  String ha_config_topic_sensor;
-  ha_config_topic_sensor = "homeassistant/" + ha_entity_type + "/hvac_" + getId() + "/" + tag + "/config";
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
+  String ha_config_topic = haGetConfigTopic(ha_entity_type, "/hvac_" + getId(), tag);
+  mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
 void haConfigButton(byte tag_id, String payload_press, String icon)
@@ -2853,8 +2860,8 @@ void haConfigButton(byte tag_id, String payload_press, String icon)
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_button = "homeassistant/button/hvac_" + getId() + "/" + tag + "/config";
-  mqttClient->publish(ha_config_topic_button.c_str(), 1, true, mqttOutput.c_str());
+  String ha_config_topic = haGetConfigTopic("button", "/hvac_" + getId(), tag);
+  mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
 void sendDeviceInfo()
@@ -2886,7 +2893,6 @@ void sendDeviceInfo()
 
 void haConfigClimate()
 {
-
   // send HA config packet
   // setup HA payload device
   const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + 2 * JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2500;
@@ -2978,6 +2984,7 @@ void haConfigClimate()
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
+  String ha_config_topic = haGetConfigTopic("climate");
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
@@ -3408,6 +3415,7 @@ void onMqttConnect(bool sessionPresent)
   mqttClient->subscribe(ha_wide_vane_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_remote_temp_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_custom_packet.c_str(), 1);
+  mqttClient->subscribe(ha_birth_topic.c_str(), 1);
   // send online message
   mqttClient->publish(ha_availability_topic.c_str(), 1, false, mqtt_payload_available);
   sendHaConfig();
