@@ -93,10 +93,16 @@ Nightly builds are available for select platforms via GitHub Actions. Go to [the
   - Arduino: Intall require libraries (name and path in platformio.ini), rename file main.cpp in main folder to main.ino, open it and build
   - Platformio: Install, open it and choose a variant to build
 
-## How to flash pre-build bin file (for ESP32 only):
+***
+## How to flash pre-build bin file:
+### ESP32
  - Download latest release bin file `mitsubishi2MQTT_ESP32DEV_IDF.bin.zip` and exact it.
  - Flash `mitsubishi2MQTT_ESP32DEV_IDF.bin` with esptool.py with command: ```esptool.py -p PORT -b 460800 --before default_reset --after no_reset --chip esp32 write_flash --flash_mode dio --flash_size keep --flash_freq 40m 0x0 mitsubishi2MQTT_ESP32DEV_IDF.bin```
  - If you do not want to install EspTool, just use EspTool web with Chrome or Edge browser here: https://espressif.github.io/esptool-js/, after connected, choose file: `mitsubishi2MQTT_ESP32DEV_IDF.bin` and then enter `Flash Address` 0x0 and press `Program`.
+### ESP8266:
+ - Download latest release bin file `mitsubishi2MQTT_WEMOS_D1_Mini.bin.zip` or `mitsubishi2MQTT_ESP8266-ESP01.bin` and exact it.
+ - Flash `mitsubishi2MQTT_WEMOS_D1_Mini.bin` with esptool.py with command: ```esptool.py -b 460800 --before default_reset --after no_reset --chip esp8266 write_flash --flash_mode dio --flash_size keep 0x0 mitsubishi2MQTT_WEMOS_D1_Mini.bin```
+ - If you do not want to install EspTool, just use EspTool web with Chrome or Edge browser here: https://espressif.github.io/esptool-js/, after connected, choose file: `mitsubishi2MQTT_WEMOS_D1_Mini.bin` and then enter `Flash Address` 0x0 and press `Program`.
 
 ***
 

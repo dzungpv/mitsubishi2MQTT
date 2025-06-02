@@ -2649,10 +2649,10 @@ String getEntityTag(byte tag_id)
   switch (tag_id)
   {
   case ENT_ROOM_TEMPERATURE:
-    return F("roomTemperature");
+    return F("room_temperature");
     break;
   case ENT_COMPR_FRQ:
-    return F("compressorFreq");
+    return F("compressor_freq");
     break;
   case ENT_CONNECTION_STATE:
     return F("connection_state");
@@ -2714,14 +2714,18 @@ String getEntityName(byte tag_id)
   }
 }
 
-String haGetConfigTopic(String entity_type, String topic_id = "", String entity_tag = "")
+String haGetConfigTopic(String entity_type, String entity_tag = "")
 {
   String ha_topic;
 
   ha_topic = (others_haa ? others_haa_topic : "homeassistant")  + "/" + entity_type + "/";
-  ha_topic += (topic_id.isEmpty() ? mqtt_fn : topic_id) + "/";
-  if (!entity_tag.isEmpty())
-    ha_topic += entity_tag + "/";
+  if (mqtt_fn.isEmpty()) {
+      mqtt_fn = getId();
+  }
+  ha_topic += mqtt_fn + "/";
+  if (!entity_tag.isEmpty()) {
+      ha_topic += entity_tag + "/";
+  }
   ha_topic += "config";
   return ha_topic;
 }
@@ -2833,7 +2837,7 @@ void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = 
     ha_entity_type = F("sensor");
   }
 
-  String ha_config_topic = haGetConfigTopic(ha_entity_type, "/hvac_" + getId(), tag);
+  String ha_config_topic = haGetConfigTopic(ha_entity_type, tag);
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
@@ -2860,7 +2864,7 @@ void haConfigButton(byte tag_id, String payload_press, String icon)
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic = haGetConfigTopic("button", "/hvac_" + getId(), tag);
+  String ha_config_topic = haGetConfigTopic("button", tag);
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
