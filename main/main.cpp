@@ -272,18 +272,7 @@ void setup()
 #else
     hp.connect(&Serial);
 #endif
-    hp.setFastSync(true); // enable fast sync because we are not care about timer nad other package
-    heatpumpStatus currentStatus = hp.getStatus();
-    heatpumpSettings currentSettings = hp.getSettings();
-    rootInfo["roomTemperature"] = convertCelsiusToLocalUnit(currentStatus.roomTemperature, useFahrenheit);
-    rootInfo["temperature"] = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-    rootInfo["fan"] = getFanModeFromHp(currentSettings.fan);
-    rootInfo["vane"] = currentSettings.vane;
-    rootInfo["wideVane"] = currentSettings.wideVane;
-    rootInfo["mode"] = hpGetMode(currentSettings);
-    rootInfo["action"] = hpGetAction(currentStatus, currentSettings);
-    rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
-    lastTempSend = millis();
+    hp.setFastSync(true); // enable fast sync because we are not care about timer and other package
     MDNS.addService("http", "tcp", 80);
   }
   else
@@ -1776,17 +1765,17 @@ void handleMetrics(AsyncWebServerRequest *request)
   if (hppower == "0")
     hpmode = "0";
 
-  metrics.replace(F("_UNIT_NAME_", hostname);
-  metrics.replace(F("_VERSION_", m2mqtt_version);
-  metrics.replace(F("_POWER_", hppower);
-  metrics.replace(F("_ROOMTEMP_", (String)currentStatus.roomTemperature);
-  metrics.replace(F("_TEMP_", (String)currentSettings.temperature);
-  metrics.replace(F("_FAN_", hpfan);
-  metrics.replace(F("_VANE_", hpvane);
-  metrics.replace(F("_WIDEVANE_", hpwidevane);
-  metrics.replace(F("_MODE_", hpmode);
-  metrics.replace(F("_OPER_", (String)currentStatus.operating);
-  metrics.replace(F("_COMPFREQ_", (String)currentStatus.compressorFrequency);
+  metrics.replace(F("_UNIT_NAME_"), hostname);
+  metrics.replace(F("_VERSION_"), m2mqtt_version);
+  metrics.replace(F("_POWER_"), hppower);
+  metrics.replace(F("_ROOMTEMP_"), (String)currentStatus.roomTemperature);
+  metrics.replace(F("_TEMP_"), (String)currentSettings.temperature);
+  metrics.replace(F("_FAN_"), hpfan);
+  metrics.replace(F("_VANE_"), hpvane);
+  metrics.replace(F("_WIDEVANE_"), hpwidevane);
+  metrics.replace(F("_MODE_"), hpmode);
+  metrics.replace(F("_OPER_"), (String)currentStatus.operating);
+  metrics.replace(F("_COMPFREQ_"), (String)currentStatus.compressorFrequency);
   sendWrappedHTML(request, metrics);
 }
 #endif
@@ -2295,9 +2284,9 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   rootInfo.clear();
   float roomTemperature = convertCelsiusToLocalUnit(currentStatus.roomTemperature, useFahrenheit);
   float temperature = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-  rootInfo["roomTemperature"] = roomTemperature;
+  rootInfo[getEntityTag(ENT_ROOM_TEMPERATURE)] = roomTemperature;
   rootInfo["temperature"] = temperature;
-  rootInfo["compressorFreq"] = currentStatus.compressorFrequency;
+  rootInfo[getEntityTag(ENT_COMPR_FRQ)] = currentStatus.compressorFrequency;
   events.send(String(roomTemperature).c_str(), "room_temperature", millis(), 50); // send data to browser
   events.send(String(temperature).c_str(), "temperature", millis(), 60);
   if (!(String(currentSettings.fan).isEmpty())) // null may crash with multitask
@@ -2930,7 +2919,7 @@ void haConfigClimate()
   temp_stat_tpl_str += "{% elif (value_json.temperature|int < " + (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + ") %}" + (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + "{% elif (value_json.temperature|int > " + (String)convertCelsiusToLocalUnit(max_temp, useFahrenheit) + ") %}" + (String)convertCelsiusToLocalUnit(max_temp, useFahrenheit) + "{% endif %}{% else %}" + (String)convertCelsiusToLocalUnit(22, useFahrenheit) + "{% endif %}";
   haConfig[F("temp_stat_tpl")] = temp_stat_tpl_str;
   haConfig[F("curr_temp_t")] = ha_state_topic;
-  String curr_temp_tpl_str = F("{{ value_json.roomTemperature if (value_json is defined and value_json.roomTemperature is defined and value_json.roomTemperature|int > ");
+  String curr_temp_tpl_str = F("{{ value_json.room_temperature if (value_json is defined and value_json.room_temperature is defined and value_json.room_temperature|int > ");
   curr_temp_tpl_str += (String)convertCelsiusToLocalUnit(1, useFahrenheit) + ") }}"; // Set default value for fix "Could not parse data for HA"
   haConfig[F("curr_temp_tpl")] = curr_temp_tpl_str;
   haConfig[F("min_temp")] = convertCelsiusToLocalUnit(min_temp, useFahrenheit);
