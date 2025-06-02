@@ -120,6 +120,7 @@ String getFanModeFromHa(String modeFromHa);
 String getFanModeFromHp(String modeFromHp);
 String getWifiBSSID();
 void sendDeviceInfo();
+String getEntityTag(byte tag_id);
 // End  header for build with IDF and Platformio
 
 #ifdef ESP8266
