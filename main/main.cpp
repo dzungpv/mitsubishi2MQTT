@@ -3583,7 +3583,7 @@ String getCurrentTime()
   tzset();
 
   localtime_r(&now, &timeinfo);
-  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%b %e %Y %H:%M:%S", &timeinfo);
   return String(strftime_buf);
 }
 
@@ -3625,7 +3625,7 @@ String getUpTime()
   time_t uptime = getUpTimeSeconds();
 
   localtime_r(&uptime, &timeinfo);
-  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%b %e %Y %H:%M:%S", &timeinfo);
   return String(strftime_buf);
 }
 
