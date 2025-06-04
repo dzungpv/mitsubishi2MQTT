@@ -2709,12 +2709,9 @@ String haGetConfigTopic(String entity_type, String entity_tag = "")
   String ha_topic;
 
   ha_topic = (others_haa ? others_haa_topic : "homeassistant")  + "/" + entity_type + "/";
-  if (mqtt_fn.isEmpty()) {
-      mqtt_fn = getId();
-  }
-  ha_topic += mqtt_fn + "/";
+  ha_topic += "hvac_" + getId() + "/";
   if (!entity_tag.isEmpty()) {
-      ha_topic += entity_tag + "/";
+    ha_topic += entity_tag + "/";
   }
   ha_topic += "config";
   return ha_topic;
