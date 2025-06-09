@@ -58,6 +58,7 @@ AsyncEventSource events("/events"); // Create an Event Source on /events
 #include <Ticker.h>   // for LED status (Using a Wemos D1-Mini)
 #include "time.h"     // time lib
 
+#ifdef ESP32
 // Let Encrypt isrgrootx1.pem
 const char rootCA_LE[] = R"====(
 -----BEGIN CERTIFICATE-----
@@ -92,6 +93,7 @@ mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
 emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----
 )====";
+#endif
 
 // wifi, mqtt and heatpump client instances
 MqttClient* mqttClient = nullptr; // espMqttClient support both in secure and secure mqtt
@@ -136,6 +138,7 @@ unsigned long lastRemoteTemp;
 StaticJsonDocument<JSON_OBJECT_SIZE(12)> rootInfo;
 String wifi_list = "";                            // cache wifi scan result
 const String localApIpUrl = "http://192.168.4.1"; // a string version of the local IP with http, used for redirecting clients to your webpage
+String unique_id = "";                            // cache board unique id
 
 // Web OTA
 int uploaderror = 0;
@@ -184,6 +187,7 @@ const PROGMEM char *model = "HVAC MITSUBISHI";
 const PROGMEM char *hostnamePrefix = "HVAC-";
 static const char *const TAG = "mitsu_cn105";
 
+
 unsigned long wifi_timeout;
 unsigned long wifi_reconnect_timeout;
 unsigned long mqtt_reconnect_timeout;
@@ -229,16 +233,15 @@ String timezone = "ICT-7"; // Set timezone to Vietnam Standard Time
 
 // Define global variables for HA topics
 String ha_power_set_topic;
-String ha_system_set_topic;
 String ha_mode_set_topic;
 String ha_temp_set_topic;
 String ha_remote_temp_set_topic;
 String ha_fan_set_topic;
 String ha_vane_set_topic;
 String ha_wide_vane_set_topic;
-String ha_settings_topic;
-String ha_system_setting_info;
 String ha_state_topic;
+String ha_system_info_topic;
+String ha_system_set_topic;
 String ha_debug_pckts_topic;
 String ha_debug_pckts_set_topic;
 String ha_debug_logs_topic;

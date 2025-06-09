@@ -59,7 +59,6 @@ void handleUploadDone(AsyncWebServerRequest *request);
 void handleUploadLoop(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final);
 void write_log(const String& log);
 heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings settings);
-void readHeatPumpSettings();
 void hpSettingsChanged();
 String hpGetMode(heatpumpSettings hpSettings);
 String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings);
@@ -76,7 +75,8 @@ float toCelsius(float fromFahrenheit);
 float convertCelsiusToLocalUnit(float temperature, bool isFahrenheit);
 float convertLocalUnitToCelsius(float temperature, bool isFahrenheit);
 String getTemperatureScale();
-String getId();
+String getMacAddr(bool keepSeparator = true);
+const String& getId();
 bool is_authenticated(AsyncWebServerRequest *request);
 void checkLogin(AsyncWebServerRequest *request);
 // AsyncMQTT
@@ -135,6 +135,8 @@ void setup()
 {
   // Start serial for debug before HVAC connect to serial
   Serial.begin(115200);
+  wifi_list.reserve(200);
+  unique_id.reserve(15);
 #ifdef ESP32
   Serial.setDebugOutput(true);
   initNVS();
@@ -178,26 +180,28 @@ void setup()
   {
     // write_log("Starting MQTT");
     //  setup HA topics
-    ha_power_set_topic = mqtt_topic + "/" + mqtt_fn + "/power/set";
-    ha_mode_set_topic = mqtt_topic + "/" + mqtt_fn + "/mode/set";
-    ha_temp_set_topic = mqtt_topic + "/" + mqtt_fn + "/temp/set";
-    ha_remote_temp_set_topic = mqtt_topic + "/" + mqtt_fn + "/remote_temp/set";
-    ha_fan_set_topic = mqtt_topic + "/" + mqtt_fn + "/fan/set";
-    ha_vane_set_topic = mqtt_topic + "/" + mqtt_fn + "/vane/set";
-    ha_wide_vane_set_topic = mqtt_topic + "/" + mqtt_fn + "/wide-vane/set";
-    ha_settings_topic = mqtt_topic + "/" + mqtt_fn + "/settings";
-    ha_state_topic = mqtt_topic + "/" + mqtt_fn + "/state";
+    String main_topic = mqtt_topic + F("/") + mqtt_fn;
+    
+    ha_power_set_topic = main_topic + F("/power/set");
+    ha_mode_set_topic = main_topic + F("/mode/set");
+    ha_temp_set_topic = main_topic + F("/temp/set");
+    ha_remote_temp_set_topic = main_topic + F("/remote_temp/set");
+    ha_fan_set_topic = main_topic + F("/fan/set");
+    ha_vane_set_topic = main_topic + F("/vane/set");
+    ha_wide_vane_set_topic = main_topic + F("/wide-vane/set");
     //
-    ha_system_setting_info = mqtt_topic + "/" + mqtt_fn + "/system/info"; // for device info
-    ha_debug_pckts_topic = mqtt_topic + "/" + mqtt_fn + "/debug/packets";
-    ha_debug_pckts_set_topic = mqtt_topic + "/" + mqtt_fn + "/debug/packets/set";
-    ha_debug_logs_topic = mqtt_topic + "/" + mqtt_fn + "/debug/logs";
-    ha_debug_logs_set_topic = mqtt_topic + "/" + mqtt_fn + "/debug/logs/set";
+    ha_debug_pckts_topic = main_topic + F("/debug/packets");
+    ha_debug_pckts_set_topic = main_topic + F("/debug/packets/set");
+    ha_debug_logs_topic = main_topic + F("/debug/logs");
+    ha_debug_logs_set_topic = main_topic + F("/debug/logs/set");
     //
-    ha_custom_packet = mqtt_topic + "/" + mqtt_fn + "/custom/send";
-    ha_availability_topic = mqtt_topic + "/" + mqtt_fn + "/availability";
-    ha_system_set_topic = mqtt_topic + "/" + mqtt_fn + "/system/set"; // for control over mqtt
-    ha_birth_topic = (others_haa ? others_haa_topic : "homeassistant") + "/status";
+    ha_state_topic = main_topic + F("/state");
+    ha_system_info_topic = main_topic + F("/system/info"); // for device info
+    ha_system_set_topic = main_topic + F("/system/set"); // for control over mqtt
+    ha_custom_packet = main_topic + F("/custom/send");
+    ha_availability_topic = main_topic + F("/availability");
+    //
+    ha_birth_topic = (others_haa ? others_haa_topic : F("homeassistant")) + F("/status");
     // startup mqtt connection
     initMqtt();
   }
@@ -973,47 +977,36 @@ boolean initWifi()
 }
 
 // Handler webserver response
-
-void sendChunkedResponse(AsyncWebServerRequest *request, const String &to_send)
-{
-  if (to_send.isEmpty())
-    return;
-
-  html_resp_length = to_send.length();
-  html_response = new char[html_resp_length + 1];
-  memcpy(html_response, to_send.c_str(), html_resp_length);
-  html_response[html_resp_length] = '\0';
-
-  static const int max_chunk_size = 1000;
-  
-  AsyncWebServerResponse *response = request->beginChunkedResponse("text/html", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    // finished ?
-    if (html_resp_length <= index) {
-      if (html_response != NULL) {
-        delete[] html_response; // cleanup memory when send completed
-        html_response = NULL;
-      }
-      return 0;
-    }
-
-    size_t len = min((size_t)max_chunk_size, min(maxLen, html_resp_length - index));
-    memcpy(buffer, html_response + index, len);
-    return len;
-  });
-
-  request->send(response);
-}
-
 void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
 {
-  String to_send = FPSTR(html_common_header);
-  to_send += content;
-  to_send += FPSTR(html_common_footer);
-  to_send.replace(F("_UNIT_NAME_"), hostname);
-  to_send.replace(F("_VERSION_"), getAppVersion());
-  to_send.replace(F("_APP_NAME_"), appName);
+  if (content.isEmpty())
+    return;
 
-  sendChunkedResponse(request, to_send);
+  String header = FPSTR(html_common_header);
+  header.replace(F("_APP_NAME_"), appName);
+  header.replace(F("_UNIT_NAME_"), hostname);
+
+  String footer = FPSTR(html_common_footer);
+  footer.replace(F("_APP_NAME_"), appName);
+  footer.replace(F("_UNIT_NAME_"), hostname);
+  footer.replace(F("_VERSION_"), getAppVersion() + F(" (") + String(ARDUINO_BOARD) + F(")"));
+
+  if (html_response != NULL)
+  {
+    delete[] html_response; // cleanup memory when send completed
+    html_response = NULL;
+  }
+
+  html_resp_length = header.length() + content.length() + footer.length();
+  html_response = new char[html_resp_length + 1];
+  memcpy(html_response, header.c_str(), header.length());
+  u_int16_t index = header.length();
+  memcpy(html_response + index, content.c_str(), content.length());
+  index += content.length();
+  memcpy(html_response + index, footer.c_str(), footer.length());
+  html_response[html_resp_length] = '\0';
+
+  request->send_P(200, "text/html", html_response);
 }
 
 void handleNotFound(AsyncWebServerRequest *request)
@@ -1339,8 +1332,10 @@ void handleUnit(AsyncWebServerRequest *request)
   }
   else
   {
-    String unitPage = FPSTR(html_page_unit);
-    String unitScriptWs = FPSTR(unit_script_ws);
+    String unitPage = FPSTR(unit_script_ws);
+    unitPage.replace(F("_TXT_UNIT_PASSWORD_NOT_MATCH_"), translatedWord(FL_(txt_unit_password_not_match)));
+
+    unitPage += FPSTR(html_page_unit);
     // localize
     unitPage.replace(F("_TXT_UNIT_TITLE_"), translatedWord(FL_(txt_unit_title)));
     unitPage.replace(F("_TXT_UNIT_LANGUAGE_"), translatedWord(FL_(txt_unit_language)));
@@ -1350,7 +1345,6 @@ void handleUnit(AsyncWebServerRequest *request)
     unitPage.replace(F("_TXT_UNIT_FAN_MODES_"), translatedWord(FL_(txt_unit_fan_modes)));
     unitPage.replace(F("_TXT_UNIT_MODES_"), translatedWord(FL_(txt_unit_modes)));
     unitPage.replace(F("_TXT_UNIT_LOGIN_USERNAME_"), translatedWord(FL_(txt_unit_login_username)));
-    unitScriptWs.replace(F("_TXT_UNIT_PASSWORD_NOT_MATCH_"), translatedWord(FL_(txt_unit_password_not_match)));
     unitPage.replace(F("_TXT_UNIT_PASSWORD_CONFIRM_"), translatedWord(FL_(txt_unit_password_confirm)));
     unitPage.replace(F("_TXT_UNIT_PASSWORD_"), translatedWord(FL_(txt_unit_password)));
     unitPage.replace(F("_TXT_F_CELSIUS_"), translatedWord(FL_(txt_f_celsius)));
@@ -1396,7 +1390,7 @@ void handleUnit(AsyncWebServerRequest *request)
       unitPage.replace(F("_MDF_NONQUIET_"), F("selected"));
     // login password
     unitPage.replace(F("_LOGIN_PASSWORD_"), login_password);
-    sendWrappedHTML(request, unitScriptWs + unitPage);
+    sendWrappedHTML(request, unitPage);
   }
 }
 
@@ -1426,22 +1420,23 @@ void handleWifi(AsyncWebServerRequest *request)
       requestWifiScan = true;
       requestWifiScanTime = millis() + 50;
     }
-    String wifiPage = FPSTR(html_page_wifi);
+
+    String wifiPageHtml = FPSTR(html_page_wifi);
     // localize
-    wifiPage.replace(F("_TXT_WIFI_TITLE_"), translatedWord(FL_(txt_wifi_title)));
-    wifiPage.replace(F("_TXT_WIFI_HOST_DESC_"), translatedWord(FL_(txt_wifi_hostname_desc)));
-    wifiPage.replace(F("_TXT_WIFI_HOST_"), translatedWord(FL_(txt_wifi_hostname)));
-    wifiPage.replace(F("_TXT_WIFI_SSID_ENTER_"), translatedWord(FL_(txt_wifi_ssid_enter)));
-    wifiPage.replace(F("_TXT_WIFI_SSID_SELECT_"), translatedWord(FL_(txt_wifi_ssid_select)));
-    wifiPage.replace(F("_TXT_WIFI_SSID_"), translatedWord(FL_(txt_wifi_ssid)));
-    wifiPage.replace(F("_TXT_WIFI_PSK_"), translatedWord(FL_(txt_wifi_psk)));
-    wifiPage.replace(F("_TXT_WIFI_OTAP_"), translatedWord(FL_(txt_wifi_otap)));
-    wifiPage.replace(F("_TXT_WIFI_STATIC_IP_"), translatedWord(FL_(txt_wifi_static_ip)));
-    wifiPage.replace(F("_TXT_WIFI_STATIC_GW_"), translatedWord(FL_(txt_wifi_static_gw)));
-    wifiPage.replace(F("_TXT_WIFI_STATIC_MASK_"), translatedWord(FL_(txt_wifi_static_mask)));
-    wifiPage.replace(F("_TXT_WIFI_STATIC_DNS_"), translatedWord(FL_(txt_wifi_static_dns)));
-    wifiPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
-    wifiPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+    wifiPageHtml.replace(F("_TXT_WIFI_TITLE_"), translatedWord(FL_(txt_wifi_title)));
+    wifiPageHtml.replace(F("_TXT_WIFI_HOST_DESC_"), translatedWord(FL_(txt_wifi_hostname_desc)));
+    wifiPageHtml.replace(F("_TXT_WIFI_HOST_"), translatedWord(FL_(txt_wifi_hostname)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_ENTER_"), translatedWord(FL_(txt_wifi_ssid_enter)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_SELECT_"), translatedWord(FL_(txt_wifi_ssid_select)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_"), translatedWord(FL_(txt_wifi_ssid)));
+    wifiPageHtml.replace(F("_TXT_WIFI_PSK_"), translatedWord(FL_(txt_wifi_psk)));
+    wifiPageHtml.replace(F("_TXT_WIFI_OTAP_"), translatedWord(FL_(txt_wifi_otap)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_IP_"), translatedWord(FL_(txt_wifi_static_ip)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_GW_"), translatedWord(FL_(txt_wifi_static_gw)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_MASK_"), translatedWord(FL_(txt_wifi_static_mask)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_DNS_"), translatedWord(FL_(txt_wifi_static_dns)));
+    wifiPageHtml.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+    wifiPageHtml.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     // set data
     String str_ap_ssid = ap_ssid;
     String str_ap_pwd = ap_pwd;
@@ -1450,20 +1445,25 @@ void handleWifi(AsyncWebServerRequest *request)
     str_ap_pwd.replace("'", F("&apos;"));
     str_ota_pwd.replace("'", F("&apos;"));
     // display wifi list
+    wifiPageHtml.replace(F("_UNIT_NAME_"), hostname);
     String wifiOptions = getWifiOptions(false);
     if (!wifiOptions.isEmpty())
     {
-      wifiPage.replace(F("_WIFI_OPTIONS_"), wifiOptions);
+      wifiPageHtml.replace(F("_WIFI_OPTIONS_"), wifiOptions);
     }
-    wifiPage.replace(F("_SSID_"), str_ap_ssid);
-    wifiPage.replace(F("_PSK_"), str_ap_pwd);
-    wifiPage.replace(F("_OTA_PWD_"), str_ota_pwd);
-    wifiPage.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
-    wifiPage.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
-    wifiPage.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
-    wifiPage.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
-    String fwCheckEvents = FPSTR(fw_check_script_events);
-    sendWrappedHTML(request, fwCheckEvents + wifiPage);
+    wifiPageHtml.replace(F("_SSID_"), str_ap_ssid);
+    wifiPageHtml.replace(F("_PSK_"), str_ap_pwd);
+    wifiPageHtml.replace(F("_OTA_PWD_"), str_ota_pwd);
+    wifiPageHtml.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
+    wifiPageHtml.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
+    wifiPageHtml.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
+    wifiPageHtml.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
+
+    String wifiPage = FPSTR(fw_check_script_events);
+    wifiPage += wifiPageHtml;
+    wifiPageHtml = "";
+
+    sendWrappedHTML(request, wifiPage);
   }
 }
 
@@ -1523,7 +1523,7 @@ void handleStatus(AsyncWebServerRequest *request)
     statusPage.replace(F("_MQTT_STATUS_"), disconnected);
   statusPage.replace(F("_WIFI_STATUS_"), String(WiFi.RSSI()));
   statusPage.replace(F("_WIFI_BSSID_"), getWifiBSSID());
-  statusPage.replace(F("_WIFI_MAC_"), getId());
+  statusPage.replace(F("_WIFI_MAC_"), getMacAddr());
   statusPage.replace(F("_BUILD_VERSION_"), getAppVersion());
   statusPage.replace(F("_BUILD_DATE_"), getBuildDatetime());
 
@@ -1539,6 +1539,96 @@ void handleStatus(AsyncWebServerRequest *request)
   sendWrappedHTML(request, statusPage);
 }
 
+String getSelectStatus(const String &curr_status, const String &status)
+{
+  if (curr_status.isEmpty())
+    return F("");
+  if (curr_status == status)
+    return F("selected");
+  return F("");
+}
+
+String getModeSelect(const String &curr_status)
+{
+  String modeSelect = FPSTR(html_page_control_mode);
+  modeSelect.replace(F("_TXT_CTRL_MODE_"), translatedWord(FL_(txt_ctrl_mode)));
+  modeSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  modeSelect.replace(F("_TXT_F_HEAT_"), translatedWord(FL_(txt_f_heat)));
+  modeSelect.replace(F("_TXT_F_DRY_"), translatedWord(FL_(txt_f_dry)));
+  modeSelect.replace(F("_TXT_F_COOL_"), translatedWord(FL_(txt_f_cool)));
+  modeSelect.replace(F("_TXT_F_FAN_"), translatedWord(FL_(txt_f_fan)));
+
+  modeSelect.replace(F("_MODE_H_"), getSelectStatus(curr_status, F("HEAT")));
+  modeSelect.replace(F("_MODE_D_"), getSelectStatus(curr_status, F("DRY")));
+  modeSelect.replace(F("_MODE_C_"), getSelectStatus(curr_status, F("COOL")));
+  modeSelect.replace(F("_MODE_F_"), getSelectStatus(curr_status, F("FAN")));
+  modeSelect.replace(F("_MODE_A_"), getSelectStatus(curr_status, F("AUTO")));
+
+  modeSelect.replace(F("_HEAT_HIDDEN_"), !supportHeatMode ? F("'hidden' style='display: none;' disabled"): F(""));
+
+  return modeSelect;
+}
+
+String getFanSelect(const String &curr_status)
+{
+  String fanSelect = FPSTR(html_page_control_fan);
+  fanSelect.replace(F("_TXT_CTRL_FAN_"), translatedWord(FL_(txt_ctrl_fan)));
+  fanSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  fanSelect.replace(F("_TXT_F_QUIET_"), translatedWord(FL_(txt_f_quiet)));
+  fanSelect.replace(F("_TXT_F_LOW_"), translatedWord(FL_(txt_f_low)));
+  fanSelect.replace(F("_TXT_F_MEDIUM_"), translatedWord(FL_(txt_f_medium)));
+  fanSelect.replace(F("_TXT_F_MIDDLE_"), translatedWord(FL_(txt_f_middle)));
+  fanSelect.replace(F("_TXT_F_HIGH_"), translatedWord(FL_(txt_f_high)));
+
+  fanSelect.replace(F("_FAN_A_"), getSelectStatus(curr_status, F("AUTO")));
+  fanSelect.replace(F("_FAN_Q_"), getSelectStatus(curr_status, F("QUIET")));
+  fanSelect.replace(F("_FAN_1_"), getSelectStatus(curr_status, F("1")));
+  fanSelect.replace(F("_FAN_2_"), getSelectStatus(curr_status, F("2")));
+  fanSelect.replace(F("_FAN_3_"), getSelectStatus(curr_status, F("3")));
+  fanSelect.replace(F("_FAN_4_"), getSelectStatus(curr_status, F("4")));
+
+  fanSelect.replace(F("_QUIET_HIDDEN_"), !supportQuietMode ? F("'hidden' style='display: none;' disabled"): F(""));
+
+  return fanSelect;
+}
+
+String getVaneSelect(const String &curr_status)
+{
+  String vaneSelect = FPSTR(html_page_control_vane);
+  vaneSelect.replace(F("_TXT_CTRL_VANE_"), translatedWord(FL_(txt_ctrl_vane)));
+  vaneSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  vaneSelect.replace(F("_TXT_F_SWING_"), translatedWord(FL_(txt_f_swing)));
+  vaneSelect.replace(F("_TXT_F_POS_"), translatedWord(FL_(txt_f_pos)));
+
+  vaneSelect.replace(F("_VANE_A_"), getSelectStatus(curr_status, F("AUTO")));
+  vaneSelect.replace(F("_VANE_1_"), getSelectStatus(curr_status, F("1")));
+  vaneSelect.replace(F("_VANE_2_"), getSelectStatus(curr_status, F("2")));
+  vaneSelect.replace(F("_VANE_3_"), getSelectStatus(curr_status, F("3")));
+  vaneSelect.replace(F("_VANE_4_"), getSelectStatus(curr_status, F("4")));
+  vaneSelect.replace(F("_VANE_5_"), getSelectStatus(curr_status, F("5")));
+  vaneSelect.replace(F("_VANE_S_"), getSelectStatus(curr_status, F("SWING")));
+
+  return vaneSelect;
+}
+
+String getWideVaneSelect(const String &curr_status)
+{
+  String wideVaneSelect = FPSTR(html_page_control_widevane);
+  wideVaneSelect.replace(F("_TXT_CTRL_WVANE_"), translatedWord(FL_(txt_ctrl_wvane)));
+  wideVaneSelect.replace(F("_TXT_F_SWING_"), translatedWord(FL_(txt_f_swing)));
+  wideVaneSelect.replace(F("_TXT_F_POS_"), translatedWord(FL_(txt_f_pos)));
+
+  wideVaneSelect.replace(F("_WVANE_1_"), getSelectStatus(curr_status, F("<<")));
+  wideVaneSelect.replace(F("_WVANE_2_"), getSelectStatus(curr_status, F("<")));
+  wideVaneSelect.replace(F("_WVANE_3_"), getSelectStatus(curr_status, F("|")));
+  wideVaneSelect.replace(F("_WVANE_4_"), getSelectStatus(curr_status, F(">")));
+  wideVaneSelect.replace(F("_WVANE_5_"), getSelectStatus(curr_status, F(">>")));
+  wideVaneSelect.replace(F("_WVANE_5_"), getSelectStatus(curr_status, F("<>")));
+  wideVaneSelect.replace(F("_WVANE_S_"), getSelectStatus(curr_status, F("SWING")));
+
+  return wideVaneSelect;
+}
+
 void handleControl(AsyncWebServerRequest *request)
 {
   checkLogin(request);
@@ -1551,164 +1641,52 @@ void handleControl(AsyncWebServerRequest *request)
     request->send(response);
     return;
   }
+
   heatpumpSettings settings = hp.getSettings();
   settings = change_states(request, settings);
-  String controlPage = FPSTR(html_page_control);
-  String controlScript = FPSTR(control_script_events);
+
+  String controlPage = FPSTR(control_script_events);
+  controlPage = FPSTR(control_script_events);
+  controlPage.replace(F("_MIN_TEMP_"), String(convertCelsiusToLocalUnit(min_temp, useFahrenheit)));
+  controlPage.replace(F("_MAX_TEMP_"), String(convertCelsiusToLocalUnit(max_temp, useFahrenheit)));
+  controlPage.replace(F("_TEMP_STEP_"), String(temp_step));
+  controlPage.replace(F("_HEAT_MODE_SUPPORT_"), (String)supportHeatMode);
+  controlPage.replace(F("_QUIET_MODE_SUPPORT_"), (String)supportQuietMode);
+
+  String htmlControlPage = FPSTR(html_page_control);
   // write_log("Enter HVAC control");
-    // localize
-  controlPage.replace(F("_TXT_CTRL_CTEMP_"), translatedWord(FL_(txt_ctrl_ctemp)));
-  controlPage.replace(F("_TXT_CTRL_TEMP_"), translatedWord(FL_(txt_ctrl_temp)));
-  controlPage.replace(F("_TXT_CTRL_TITLE_"), translatedWord(FL_(txt_ctrl_title)));
-  controlPage.replace(F("_TXT_CTRL_POWER_"), translatedWord(FL_(txt_ctrl_power)));
-  controlPage.replace(F("_TXT_CTRL_MODE_"), translatedWord(FL_(txt_ctrl_mode)));
-  controlPage.replace(F("_TXT_CTRL_FAN_"), translatedWord(FL_(txt_ctrl_fan)));
-  controlPage.replace(F("_TXT_CTRL_VANE_"), translatedWord(FL_(txt_ctrl_vane)));
-  controlPage.replace(F("_TXT_CTRL_WVANE_"), translatedWord(FL_(txt_ctrl_wvane)));
-  controlPage.replace(F("_TXT_F_ON_"), translatedWord(FL_(txt_f_on)));
-  controlPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
-  controlPage.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
-  controlPage.replace(F("_TXT_F_HEAT_"), translatedWord(FL_(txt_f_heat)));
-  controlPage.replace(F("_TXT_F_DRY_"), translatedWord(FL_(txt_f_dry)));
-  controlPage.replace(F("_TXT_F_COOL_"), translatedWord(FL_(txt_f_cool)));
-  controlPage.replace(F("_TXT_F_FAN_"), translatedWord(FL_(txt_f_fan)));
-  controlPage.replace(F("_TXT_F_QUIET_"), translatedWord(FL_(txt_f_quiet)));
-  controlPage.replace(F("_TXT_F_LOW_"), translatedWord(FL_(txt_f_low)));
-  controlPage.replace(F("_TXT_F_MEDIUM_"), translatedWord(FL_(txt_f_medium)));
-  controlPage.replace(F("_TXT_F_MIDDLE_"), translatedWord(FL_(txt_f_middle)));
-  controlPage.replace(F("_TXT_F_HIGH_"), translatedWord(FL_(txt_f_high)));
-  controlPage.replace(F("_TXT_F_SWING_"), translatedWord(FL_(txt_f_swing)));
-  controlPage.replace(F("_TXT_F_POS_"), translatedWord(FL_(txt_f_pos)));
-  controlPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+  // localize
+  htmlControlPage.replace(F("_TXT_CTRL_CTEMP_"), translatedWord(FL_(txt_ctrl_ctemp)));
+  htmlControlPage.replace(F("_TXT_CTRL_TEMP_"), translatedWord(FL_(txt_ctrl_temp)));
+  htmlControlPage.replace(F("_TXT_CTRL_TITLE_"), translatedWord(FL_(txt_ctrl_title)));
+  htmlControlPage.replace(F("_TXT_CTRL_POWER_"), translatedWord(FL_(txt_ctrl_power)));
+
+  htmlControlPage.replace(F("_TXT_F_ON_"), translatedWord(FL_(txt_f_on)));
+  htmlControlPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
   // set data
-  controlScript.replace(F("_MIN_TEMP_"), String(convertCelsiusToLocalUnit(min_temp, useFahrenheit)));
-  controlScript.replace(F("_MAX_TEMP_"), String(convertCelsiusToLocalUnit(max_temp, useFahrenheit)));
-  controlScript.replace(F("_TEMP_STEP_"), String(temp_step));
-  controlPage.replace(F("_ROOMTEMP_"), String(convertCelsiusToLocalUnit(hp.getRoomTemperature(), useFahrenheit)));
-  controlPage.replace(F("_USE_FAHRENHEIT_"), (String)useFahrenheit);
-  controlPage.replace(F("_TEMP_SCALE_"), getTemperatureScale());
-  if (!supportHeatMode)
-  {
-    controlPage.replace(F("_HEAT_HIDDEN_"), F("'hidden' style='display: none;' disabled"));
-  }
-  else
-  {
-    controlPage.replace(F("_HEAT_HIDDEN_"), "");
-  }
-  controlScript.replace(F("_HEAT_MODE_SUPPORT_"), (String)supportHeatMode);
+  htmlControlPage.replace(F("_ROOMTEMP_"), String(convertCelsiusToLocalUnit(hp.getRoomTemperature(), useFahrenheit)));
+  htmlControlPage.replace(F("_TEMP_SCALE_"), getTemperatureScale());
+  htmlControlPage.replace(F("_TEMP_"), String(convertCelsiusToLocalUnit(hp.getTemperature(), useFahrenheit)));
 
   if (!(String(settings.power).isEmpty())) // null may crash with multitask
   {
-    controlPage.replace(F("_POWER_"), strcmp(settings.power, "ON") == 0 ? F("checked") : F(""));
+    htmlControlPage.replace(F("_POWER_"), strcmp(settings.power, "ON") == 0 ? F("checked") : F(""));
   }
 
-  if (strcmp(settings.mode, "HEAT") == 0)
-  {
-    controlPage.replace(F("_MODE_H_"), F("selected"));
-  }
-  else if (strcmp(settings.mode, "DRY") == 0)
-  {
-    controlPage.replace(F("_MODE_D_"), F("selected"));
-  }
-  else if (strcmp(settings.mode, "COOL") == 0)
-  {
-    controlPage.replace(F("_MODE_C_"), F("selected"));
-  }
-  else if (strcmp(settings.mode, "FAN") == 0)
-  {
-    controlPage.replace(F("_MODE_F_"), F("selected"));
-  }
-  else if (strcmp(settings.mode, "AUTO") == 0)
-  {
-    controlPage.replace(F("_MODE_A_"), F("selected"));
-  }
+  controlPage += htmlControlPage;
+  htmlControlPage = "";
 
-  if (strcmp(settings.fan, "AUTO") == 0)
-  {
-    controlPage.replace(F("_FAN_A_"), F("selected"));
-  }
-  else if (strcmp(settings.fan, "QUIET") == 0)
-  {
-    controlPage.replace(F("_FAN_Q_"), F("selected"));
-  }
-  else if (strcmp(settings.fan, "1") == 0)
-  {
-    controlPage.replace(F("_FAN_1_"), F("selected"));
-  }
-  else if (strcmp(settings.fan, "2") == 0)
-  {
-    controlPage.replace(F("_FAN_2_"), F("selected"));
-  }
-  else if (strcmp(settings.fan, "3") == 0)
-  {
-    controlPage.replace(F("_FAN_3_"), F("selected"));
-  }
-  else if (strcmp(settings.fan, "4") == 0)
-  {
-    controlPage.replace(F("_FAN_4_"), F("selected"));
-  }
+  controlPage += getModeSelect(String(settings.mode));
+  controlPage += getFanSelect(String(settings.fan));
+  controlPage += getVaneSelect(String(settings.vane));
+  controlPage += getWideVaneSelect(String(settings.wideVane));
+  
+  htmlControlPage = FPSTR(html_page_control_footer); 
+  htmlControlPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+  controlPage += htmlControlPage;
+  htmlControlPage = "";
 
-  if (strcmp(settings.vane, "AUTO") == 0)
-  {
-    controlPage.replace(F("_VANE_A_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "1") == 0)
-  {
-    controlPage.replace(F("_VANE_1_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "2") == 0)
-  {
-    controlPage.replace(F("_VANE_2_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "3") == 0)
-  {
-    controlPage.replace(F("_VANE_3_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "4") == 0)
-  {
-    controlPage.replace(F("_VANE_4_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "5") == 0)
-  {
-    controlPage.replace(F("_VANE_5_"), F("selected"));
-  }
-  else if (strcmp(settings.vane, "SWING") == 0)
-  {
-    controlPage.replace(F("_VANE_S_"), F("selected"));
-  }
-
-  if (strcmp(settings.wideVane, "<<") == 0)
-  {
-    controlPage.replace(F("_WVANE_1_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, "<") == 0)
-  {
-    controlPage.replace(F("_WVANE_2_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, "|") == 0)
-  {
-    controlPage.replace(F("_WVANE_3_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, ">") == 0)
-  {
-    controlPage.replace(F("_WVANE_4_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, ">>") == 0)
-  {
-    controlPage.replace(F("_WVANE_5_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, "<>") == 0)
-  {
-    controlPage.replace(F("_WVANE_6_"), F("selected"));
-  }
-  else if (strcmp(settings.wideVane, "SWING") == 0)
-  {
-    controlPage.replace(F("_WVANE_S_"), F("selected"));
-  }
-  controlPage.replace(F("_TEMP_"), String(convertCelsiusToLocalUnit(hp.getTemperature(), useFahrenheit)));
-
-  sendWrappedHTML(request, controlScript + controlPage);
-  controlPage = "";
+  sendWrappedHTML(request, controlPage);
   // We need to send the page content in chunks to overcome
   // a limitation on the maximum size we can send at one
   // time (approx 6k).
@@ -2062,38 +2040,46 @@ void write_log(const String& log)
 heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings settings)
 {
   bool update = false;
-  if (request->hasArg("PWRCHK"))
+  if (request->args() == 0)
+    return settings;
+
+  if (request->hasArg(F("PWRCHK")))
   {
-    settings.power = request->hasArg("POWER") ? "ON" : "OFF";
+    settings.power = request->hasArg(F("POWER")) ? "ON" : "OFF";
     update = true;
   }
-  if (request->hasArg("MODE"))
+  if (request->hasArg(F("MODE")))
   {
-    ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
-    settings.mode = request->arg("MODE").c_str();
-    ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
+    //ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
+    settings.mode = request->arg(F("MODE")).c_str();
+    //ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
+    update = true;
+
+  }
+  if (request->hasArg(F("TEMP")))
+  {
+    float new_temp = convertLocalUnitToCelsius(request->arg(F("TEMP")).toFloat(), useFahrenheit);
+    if (new_temp != settings.temperature)
+    {
+      settings.temperature = new_temp;
+      update = true;
+    }
+  }
+  if (request->hasArg(F("FAN")))
+  {
+    //ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
+    settings.fan = request->arg(F("FAN")).c_str();
+    //ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
     update = true;
   }
-  if (request->hasArg("TEMP"))
+  if (request->hasArg(F("VANE")))
   {
-    settings.temperature = convertLocalUnitToCelsius(request->arg("TEMP").toFloat(), useFahrenheit);
+    settings.vane = request->arg(F("VANE")).c_str();
     update = true;
   }
-  if (request->hasArg("FAN"))
+  if (request->hasArg(F("WIDEVANE")))
   {
-    ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
-    settings.fan = request->arg("FAN").c_str();
-    ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
-    update = true;
-  }
-  if (request->hasArg("VANE"))
-  {
-    settings.vane = request->arg("VANE").c_str();
-    update = true;
-  }
-  if (request->hasArg("WIDEVANE"))
-  {
-    settings.wideVane = request->arg("WIDEVANE").c_str();
+    settings.wideVane = request->arg(F("WIDEVANE")).c_str();
     update = true;
   }
   if (update)
@@ -2101,28 +2087,16 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
     hp.setSettings(settings);
     if (hp.getSettings() == hp.getWantedSettings()) // only update it settings change
     {
-      ESP_LOGW(TAG, "Same Settings to HP, Igrore");
+      ESP_LOGW(TAG, F("Same Settings to HP, Igrore"));
     }
     else
     {
-      ESP_LOGI(TAG, "Send Settings to HP");
+      ESP_LOGI(TAG, F("Send Settings to HP"));
       requestHpUpdate = true;
       requestHpUpdateTime = millis() + 10;
     }
   }
   return settings;
-}
-
-void readHeatPumpSettings()
-{
-  heatpumpSettings currentSettings = hp.getSettings();
-
-  rootInfo.clear();
-  rootInfo["temperature"] = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-  rootInfo["fan"] = getFanModeFromHp(currentSettings.fan);
-  rootInfo["vane"] = currentSettings.vane;
-  rootInfo["wideVane"] = currentSettings.wideVane;
-  rootInfo["mode"] = hpGetMode(currentSettings);
 }
 
 void hpSettingsChanged()
@@ -2131,77 +2105,66 @@ void hpSettingsChanged()
   {
     return;
   }
-  // send room temp, operating info and all information
-  readHeatPumpSettings();
 
-  if (mqttClient != nullptr && mqttClient->connected())
-  {
-    String mqttOutput;
-    serializeJson(rootInfo, mqttOutput);
-    if (!mqttClient->publish(ha_settings_topic.c_str(), 1, false, mqttOutput.c_str()))
-    {
-      if (_debugModeLogs)
-        mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, (char *)("Failed to publish hp settings"));
-    }
-  }
+  // send room temp, operating info and all information
   hpStatusChanged(hp.getStatus());
 }
 
 // Convert mode for home assistant
 String getFanModeFromHp(String modeFromHp)
 {
-  if (modeFromHp == "QUIET")
+  if (modeFromHp == F("QUIET"))
   {
-    return "diffuse";
+    return F("diffuse");
   }
-  else if (modeFromHp == "1")
+  else if (modeFromHp == F("1"))
   {
-    return "low";
+    return F("low");
   }
-  else if (modeFromHp == "2")
+  else if (modeFromHp == F("2"))
   {
-    return "medium";
+    return F("medium");
   }
-  else if (modeFromHp == "3")
+  else if (modeFromHp == F("3"))
   {
-    return "middle";
+    return F("middle");
   }
-  else if (modeFromHp == "4")
+  else if (modeFromHp == F("4"))
   {
-    return "high";
+    return F("high");
   }
   else
   { // case "AUTO" or default:
-    return "auto";
+    return F("auto");
   }
 }
 
 // Convert mode for heatpump lib
 String getFanModeFromHa(String modeFromHa)
 {
-  if (modeFromHa == "diffuse")
+  if (modeFromHa == F("diffuse"))
   {
-    return "QUIET";
+    return F("QUIET");
   }
-  else if (modeFromHa == "low")
+  else if (modeFromHa == F("low"))
   {
-    return "1";
+    return F("1");
   }
-  else if (modeFromHa == "medium")
+  else if (modeFromHa == F("medium"))
   {
-    return "2";
+    return F("2");
   }
-  else if (modeFromHa == "middle")
+  else if (modeFromHa == F("middle"))
   {
-    return "3";
+    return F("3");
   }
-  else if (modeFromHa == "high")
+  else if (modeFromHa == F("high"))
   {
-    return "4";
+    return F("4");
   }
   else
   { // case "AUTO" or default:
-    return "AUTO";
+    return F("AUTO");
   }
 }
 
@@ -2213,16 +2176,16 @@ String hpGetMode(heatpumpSettings hpSettings)
   String hppower = String(hpSettings.power);
   if (hppower.equalsIgnoreCase("off"))
   {
-    return "off";
+    return F("off");
   }
 
   String hpmode = String(hpSettings.mode);
   hpmode.toLowerCase();
 
   if (hpmode == "fan")
-    return "fan_only";
+    return F("fan_only");
   else if (hpmode == "auto")
-    return "heat_cool";
+    return F("heat_cool");
   else
     return hpmode; // cool, heat, dry
 }
@@ -2235,16 +2198,16 @@ String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings)
   String hppower = String(hpSettings.power);
   if (hppower.equalsIgnoreCase("off"))
   {
-    return "off";
+    return F("off");
   }
 
   String hpmode = String(hpSettings.mode);
   hpmode.toLowerCase();
 
   if (hpmode == "fan")
-    return "fan";
+    return F("fan");
   else if (!hpStatus.operating)
-    return "idle";
+    return F("idle");
   else if (hpmode == "auto")
   {
     // If the "operating" flag is true and the heat pump is in "auto" mode,
@@ -2252,18 +2215,18 @@ String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings)
     // indicate which of those two states it's in. We can infer the state by
     // comparing the room temperature to the set point temperature.
     if (hpStatus.roomTemperature > hpSettings.temperature) // above set point
-      return "cooling";
+      return F("cooling");
     else if (hpStatus.roomTemperature < hpSettings.temperature) // below set point
-      return "heating";
+      return F("heating");
     else
       return hpmode; // unknown
   }
   else if (hpmode == "cool")
-    return "cooling";
+    return F("cooling");
   else if (hpmode == "heat")
-    return "heating";
+    return F("heating");
   else if (hpmode == "dry")
-    return "drying";
+    return F("drying");
   else
     return hpmode; // unknown
 }
@@ -2287,7 +2250,6 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   float temperature = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
   rootInfo[getEntityTag(ENT_ROOM_TEMPERATURE)] = roomTemperature;
   rootInfo["temperature"] = temperature;
-  rootInfo[getEntityTag(ENT_COMPR_FRQ)] = currentStatus.compressorFrequency;
   events.send(String(roomTemperature).c_str(), "room_temperature", millis(), 50); // send data to browser
   events.send(String(temperature).c_str(), "temperature", millis(), 60);
   if (!(String(currentSettings.fan).isEmpty())) // null may crash with multitask
@@ -2309,7 +2271,7 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   rootInfo["action"] = hpGetAction(currentStatus, currentSettings);
   events.send(currentSettings.mode, "mode", millis(), 100);
   events.send(currentSettings.power, "power", millis(), 110);
-  rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
+  rootInfo[getEntityTag(ENT_COMPR_FRQ)] = currentStatus.compressorFrequency;
   if (mqttClient != nullptr && mqttClient->connected())
   {
     String mqttOutput;
@@ -2395,7 +2357,8 @@ void hpSendLocalState()
   {
     String mqttOutput;
     serializeJson(rootInfo, mqttOutput);
-    mqttClient->publish(ha_debug_pckts_topic.c_str(), 1, false, mqttOutput.c_str());
+    if (_debugModePckts)
+      mqttClient->publish(ha_debug_pckts_topic.c_str(), 1, false, mqttOutput.c_str());
     if (!mqttClient->publish(ha_state_topic.c_str(), 1, false, mqttOutput.c_str()))
     {
       if (_debugModeLogs)
@@ -2431,8 +2394,8 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
     modeUpper.toUpperCase();
     if (modeUpper == "OFF")
     {
-      rootInfo["mode"] = "off";
-      rootInfo["action"] = "off";
+      rootInfo["mode"] = F("off");
+      rootInfo["action"] = F("off");
       hpSendLocalState();
       hp.setPowerSetting("OFF");
       update = true;
@@ -2441,30 +2404,30 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
     {
       if (modeUpper == "HEAT_COOL")
       {
-        rootInfo["mode"] = "heat_cool";
-        rootInfo["action"] = "idle";
-        modeUpper = "AUTO";
+        rootInfo["mode"] = F("heat_cool");
+        rootInfo["action"] = F("idle");
+        modeUpper = F("AUTO");
       }
       else if (modeUpper == "HEAT")
       {
-        rootInfo["mode"] = "heat";
-        rootInfo["action"] = "heating";
+        rootInfo["mode"] = F("heat");
+        rootInfo["action"] = F("heating");
       }
       else if (modeUpper == "COOL")
       {
-        rootInfo["mode"] = "cool";
-        rootInfo["action"] = "cooling";
+        rootInfo["mode"] = F("cool");
+        rootInfo["action"] = F("cooling");
       }
       else if (modeUpper == "DRY")
       {
-        rootInfo["mode"] = "dry";
-        rootInfo["action"] = "drying";
+        rootInfo["mode"] = F("dry");
+        rootInfo["action"] = F("drying");
       }
       else if (modeUpper == "FAN_ONLY")
       {
-        rootInfo["mode"] = "fan_only";
-        rootInfo["action"] = "fan";
-        modeUpper = "FAN";
+        rootInfo["mode"] = F("fan_only");
+        rootInfo["action"] = F("fan");
+        modeUpper = F("FAN");
       }
       else
       {
@@ -2742,6 +2705,7 @@ void haConfigureDevice(DynamicJsonDocument &haConfig)
   // other device infos
   haConfigDevice[F("name")] = mqtt_fn;
   haConfigDevice[F("sw")] = String(appName) + " " + String(getAppVersion());
+  haConfigDevice[F("hw")] = String(ARDUINO_BOARD);  
   haConfigDevice[F("mdl")] = model;
   haConfigDevice[F("mf")] = manufacturer;
   haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
@@ -2783,29 +2747,29 @@ void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = 
     haConfig[F("dev_cla")] = "connectivity";
     haConfig[F("payload_on")] = "online";
     haConfig[F("payload_off")] = "offline";
-    haConfig[F("stat_t")] = ha_system_setting_info;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
   else if (tag_id == ENT_UP_TIME)
   {
     haConfig[F("dev_cla")] = "timestamp";
     haConfig[F("val_tpl")] = "{{ as_datetime(value_json." + tag + ") }}";
     // haConfig[F("unit_of_meas")] = unit;
-    haConfig[F("stat_t")] = ha_system_setting_info;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
   else if (tag_id == ENT_FREE_HEAP)
   {
     haConfig[F("unit_of_meas")] = unit;
     haConfig[F("sug_dsp_prc")] = 0;
-    haConfig[F("stat_t")] = ha_system_setting_info;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
   else if (tag_id == ENT_RSSI)
   {
     haConfig[F("unit_of_meas")] = unit;
-    haConfig[F("stat_t")] = ha_system_setting_info;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
   else if (tag_id == ENT_BSSI)
   {
-    haConfig[F("stat_t")] = ha_system_setting_info;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
 
   if (is_diagnostic)
@@ -2864,7 +2828,7 @@ void sendDeviceInfo()
   uint32_t freeHeapBytes = getFreeHeapBytes();
   uint32_t totalHeapBytes = getTotalHeapBytes();
 
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  const size_t capacity = JSON_OBJECT_SIZE(10);
   DynamicJsonDocument haConfigInfo(capacity);
 
   haConfigInfo[getEntityTag(ENT_CONNECTION_STATE)] = hp.isConnected() ? "online" : "offline";
@@ -2882,7 +2846,7 @@ void sendDeviceInfo()
 
   String mqttOutput;
   serializeJson(haConfigInfo, mqttOutput);
-  mqttClient->publish(ha_system_setting_info.c_str(), 1, false, mqttOutput.c_str());
+  mqttClient->publish(ha_system_info_topic.c_str(), 1, false, mqttOutput.c_str());
 }
 
 void haConfigClimate()
@@ -2931,7 +2895,10 @@ void haConfigClimate()
   // fan control
   JsonArray haConfigFan_modes = haConfig.createNestedArray(F("fan_modes"));
   haConfigFan_modes.add(F("auto"));  //AUTO
-  haConfigFan_modes.add(F("diffuse")); //QUIET
+  if (supportQuietMode)
+  {
+    haConfigFan_modes.add(F("diffuse")); //QUIET
+  }
   haConfigFan_modes.add(F("low")); //1 native
   haConfigFan_modes.add(F("medium")); //2 native
   haConfigFan_modes.add(F("middle")); //3 native
@@ -3147,18 +3114,32 @@ String getTemperatureScale()
   }
 }
 
-String getId() {
+String getMacAddr(bool keepSeparator) {
 #ifdef ESP32
     unsigned char mac_base[6] = {0};
     esp_read_mac(mac_base, ESP_MAC_WIFI_STA);
+    if (keepSeparator)
+    {
+      char chipID[19];
+      snprintf(chipID, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5]);
+      return String(chipID);
+    }
+
     char chipID[14];
     snprintf(chipID, 13, "%02X%02X%02X%02X%02X%02X", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5]);
     return String(chipID);
 #else
     String chipID = WiFi.macAddress();
-    chipID.replace(":", "");
+    if (!keepSeparator)
+      chipID.replace(":", "");
     return chipID;
 #endif
+}
+
+const String& getId() {
+  if (unique_id.isEmpty())
+    unique_id = getMacAddr(false);
+  return unique_id;
 }
 
 // Check if header is present and correct
@@ -3675,16 +3656,10 @@ String getBuildDatetime()
 {
   if (build_date_time.isEmpty())
   {
-#ifdef ESP32
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
-    build_date_time = String(app_desc->date) + ", " + String(app_desc->time);
-    return build_date_time;
-#else
     char builDate[64];
     sprintf(builDate, "%s %s", __DATE__, __TIME__);
     build_date_time = String(builDate);
     return build_date_time;
-#endif
   }
   return build_date_time;
 }
@@ -3746,8 +3721,27 @@ void getWifiList()
     }
     int32_t rssi = WiFi.RSSI(i);
     if (rssi > top_k_rssi[min_index]) {
-      top_k_rssi[min_index] = rssi;
-      top_k_idx[min_index] = i;
+      // check for ssid with same name in the list
+      String bssi = WiFi.SSID(i);
+      bool found = false;
+      for (int j = 0; j < k; j++) {
+        if (top_k_rssi[j] == INT32_MIN)
+          break;
+        // replace exixting if better rssi
+        if (bssi == WiFi.SSID(top_k_idx[j])) {
+          if (rssi > top_k_rssi[j]) {
+            top_k_rssi[j] = rssi;
+            top_k_idx[j] = i;
+          }
+          found = true;
+          break;
+        }
+      }
+      if (!found)
+      {
+        top_k_rssi[min_index] = rssi;
+        top_k_idx[min_index] = i;
+      }
     }
   }
 
@@ -3764,19 +3758,17 @@ void getWifiList()
   wifi_list.clear();
   for (int i = 0; i < k; ++i) // only first 5 networkd
   {
+    if (top_k_rssi[i] == INT32_MIN)
+      break;
     int idx = top_k_idx[i];
     String ssid = WiFi.SSID(idx);
     if (!ssid.isEmpty())
     {
       ESP_LOGI(TAG, "Found %s: ", ssid.c_str());
-      if (i == 0)
-      {
-        wifi_list += ssid;
+      if (!wifi_list.isEmpty()) {
+        wifi_list += ";";
       }
-      else
-      {
-        wifi_list += ";" + ssid;
-      }
+      wifi_list += ssid;
     }
   }
   WiFi.scanDelete();

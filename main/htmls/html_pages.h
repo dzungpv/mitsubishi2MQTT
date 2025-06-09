@@ -238,7 +238,6 @@ const char html_page_wifi[] PROGMEM =
 ;
 
 const char html_page_control[] PROGMEM =
-
         "<div style='text-align:center;'>"
             "<h2>_TXT_CTRL_CTEMP_ <span id='room_temperature'>_ROOMTEMP_</span>&#176;</h2>"
         "</div>"
@@ -267,7 +266,9 @@ const char html_page_control[] PROGMEM =
                      "</label>"
                     "</form>"
                 "</p>"
-                "</div>"
+                "</div>";
+
+const char html_page_control_mode[] PROGMEM =
                 "<div class='ctrlrow'>"
                 "<p><b>_TXT_CTRL_MODE_</b>"
                     "<form onchange='this.submit()' method='post'>"
@@ -280,13 +281,15 @@ const char html_page_control[] PROGMEM =
                         "</select>"
                     "</form>"
                 "</p>"
-                "</div>"
+                "</div>";
+
+const char html_page_control_fan[] PROGMEM =
                 "<div class='ctrlrow'>"
                 "<p><b>_TXT_CTRL_FAN_</b>"
                     "<form onchange='this.submit()' method='post'>"
                         "<select name='FAN' id='FAN'>"
                             "<option value='AUTO' _FAN_A_>&#9851; _TXT_F_AUTO_</option>"
-                            "<option value='QUIET' _FAN_Q_>.... _TXT_F_QUIET_</option>"
+                            "<option _QUIET_HIDDEN_ value='QUIET' _FAN_Q_>.... _TXT_F_QUIET_</option>"
                             "<option value='1' _FAN_1_>...: _TXT_F_LOW_</option>"
                             "<option value='2' _FAN_2_>..:: _TXT_F_MEDIUM_</option>"
                             "<option value='3' _FAN_3_>.::: _TXT_F_MIDDLE_</option>"
@@ -294,7 +297,9 @@ const char html_page_control[] PROGMEM =
                         "</select>"
                     "</form>"
                 "</p>"
-                "</div>"
+                "</div>";
+
+const char html_page_control_vane[] PROGMEM =
                 "<div class='ctrlrow' _VANE_STYLE_>"
                 "<p><b>_TXT_CTRL_VANE_</b>"
                     "<form onchange='this.submit()' method='post'>"
@@ -309,7 +314,9 @@ const char html_page_control[] PROGMEM =
                         "</select>"
                     "</form>"
                 "</p>"
-                "</div>"
+                "</div>";
+
+const char html_page_control_widevane[] PROGMEM =
                 "<div class='ctrlrow' _WIDE_VANE_STYLE_>"
                 "<p><b>_TXT_CTRL_WVANE_</b>"
                     "<form onchange='this.submit()' method='post'>"
@@ -324,7 +331,9 @@ const char html_page_control[] PROGMEM =
                         "</select>"
                     "</form>"
                 "</p>"
-                "</div>"
+                "</div>";
+
+const char html_page_control_footer[] PROGMEM =
             "</fieldset>"
             "<p>"
 			    "<form action='/' method='get'>"
