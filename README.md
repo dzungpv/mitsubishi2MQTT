@@ -115,7 +115,7 @@ The `topic` is: "mqtt_topic/mqtt_friendly_name"
 - topic/fan/set 1-4 AUTO QUIET
 - topic/vane/set 1-5 SWING AUTO
 - topic/wide-vane/set << < | > >>
-- topic/settings
+- ~~topic/settings~~ (replaced by topic/state)
 - topic/state
 - topic/debug/packets
 - topic/debug/packets/set on off
