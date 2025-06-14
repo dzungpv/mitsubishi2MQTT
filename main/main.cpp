@@ -31,8 +31,8 @@ bool loadUnit();
 bool loadOthers();
 void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const String& mqttUser, const String& mqttPwd, String mqttTopic, const String& mqttRootCaCert);
 void saveUnit(String tempUnit, String supportMode, String supportFanMode, String loginPassword, String tempStep, String languageIndex);
-void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd);
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin);
+void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd, const String& local_ip, const String& gw_ip, const String& subnet_ip, const String& dns_ip);
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz, const String &ntp);
 void saveCurrentOthers();
 void initCaptivePortal();
 void initMqtt();
@@ -120,7 +120,8 @@ String getFanModeFromHa(String modeFromHa);
 String getFanModeFromHp(String modeFromHp);
 String getWifiBSSID();
 void sendDeviceInfo();
-String getEntityTag(byte tag_id);
+const char* getEntityTag(byte tag_id);
+const char* getEntityName(byte tag_id);
 // End  header for build with IDF and Platformio
 
 #ifdef ESP8266
@@ -2597,74 +2598,44 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
   delete[] message;
 }
 
-String getEntityTag(byte tag_id)
-{
-  switch (tag_id)
-  {
-  case ENT_ROOM_TEMPERATURE:
-    return F("room_temperature");
-    break;
-  case ENT_COMPR_FRQ:
-    return F("compressor_freq");
-    break;
-  case ENT_CONNECTION_STATE:
-    return F("connection_state");
-    break;
-  case ENT_UP_TIME:
-    return F("up_time");
-    break;
-  case ENT_FREE_HEAP:
-    return F("free_heap");
-    break;
-  case ENT_RSSI:
-    return F("rssi");
-    break;
-  case ENT_BSSI:
-    return F("bssi");
-    break;
-  case ENT_RESTART_BTN:
-    return F("restart");
-    break;
-  
-  default:
+// Lookup tables for Tag lookup
+static const char* const entityTagLUT[MAX_ENTITY_ID + 1] = {
+    /* 0 */ F("room_temperature"),
+    /* 1 */ F("connection_state"),
+    /* 2 */ F("up_time"),
+    /* 3 */ F("free_heap"),
+    /* 4 */ F("rssi"),
+    /* 5 */ F("bssi"),
+    /* 6 */ F("compressor_freq"),
+    /* 7 */ F("restart"),
+    /* 8 */ F("webpanel"),};
+
+// Lookup tables for Name lookup
+static const char* const entityNameLUT[MAX_ENTITY_ID + 1] = {
+    /* 0 */ F("Room Temperature"),
+    /* 1 */ F("Connection state"),
+    /* 2 */ F("Up Time"),
+    /* 3 */ F("Free Heap"),
+    /* 4 */ F("RSSI"),
+    /* 5 */ F("BSSI"),
+    /* 6 */ F("Compressor Freq"),
+    /* 7 */ F("Restart"),
+    /* 8 */ F("WebPanel")};
+
+//Fast lookup functions for Tag
+const char* getEntityTag(byte tag_id) {
+    if (tag_id <= MAX_ENTITY_ID) {
+        return entityTagLUT[tag_id];
+    }
     return F("unknown");
-    break;
-  }
 }
 
-String getEntityName(byte tag_id)
-{
-  switch (tag_id)
-  {
-  case ENT_ROOM_TEMPERATURE:
-    return F("Room temperature");
-    break;
-  case ENT_COMPR_FRQ:
-    return F("Compressor frequency");
-    break;
-  case ENT_CONNECTION_STATE:
-    return F("Connection state");
-    break;
-  case ENT_UP_TIME:
-    return F("Up time");
-    break;
-  case ENT_FREE_HEAP:
-    return F("Free heap");
-    break;
-  case ENT_RSSI:
-    return F("RSSI");
-    break;
-  case ENT_BSSI:
-    return F("BSSI");
-    break;
-  case ENT_RESTART_BTN:
-    return F("Restart");
-    break;
-  
-  default:
+//Fast lookup functions for Name
+const char* getEntityName(byte tag_id) {
+    if (tag_id <= MAX_ENTITY_ID) {
+        return entityNameLUT[tag_id];
+    }
     return F("Unknown");
-    break;
-  }
 }
 
 String haGetConfigTopic(String entity_type, String entity_tag = "")

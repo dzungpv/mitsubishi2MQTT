@@ -335,13 +335,16 @@ const char *const language_names[] = {
 #endif
 
 const byte ENT_ROOM_TEMPERATURE = 0;
-const byte ENT_COMPR_FRQ = 1;
-const byte ENT_CONNECTION_STATE = 2;
-const byte ENT_UP_TIME = 3;
-const byte ENT_FREE_HEAP = 4;
-const byte ENT_RSSI = 5;
-const byte ENT_BSSI = 6;
-const byte ENT_RESTART_BTN = 10;
+const byte ENT_CONNECTION_STATE = 1;
+const byte ENT_UP_TIME = 2;
+const byte ENT_FREE_HEAP = 3;
+const byte ENT_RSSI = 4;
+const byte ENT_BSSI = 5;
+const byte ENT_COMPR_FRQ = 6;
+const byte ENT_RESTART_BTN = 7;
+const byte ENT_WEB_PANEL = 8;
+
+const byte MAX_ENTITY_ID = ENT_WEB_PANEL;
 
 static constexpr uint8_t NUM_LANGUAGES = sizeof(languages) / sizeof(const char *);
 
