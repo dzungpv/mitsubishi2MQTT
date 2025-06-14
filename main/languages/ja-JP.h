@@ -98,6 +98,7 @@ namespace ja
   const char txt_others_tz[] PROGMEM = "タイムゾーン";
   const char txt_others_tz_list[] PROGMEM = "リストを見る";
   const char txt_others_ntp_server[] PROGMEM = "NTP サーバー";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "ステータス";

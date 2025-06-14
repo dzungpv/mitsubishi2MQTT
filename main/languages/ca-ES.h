@@ -98,6 +98,7 @@ namespace ca
   const char txt_others_tz[] PROGMEM = "Fus horari";
   const char txt_others_tz_list[] PROGMEM = "Vegeu-ne la llista";
   const char txt_others_ntp_server[] PROGMEM = "Servidor NTP";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Estat";

@@ -98,6 +98,7 @@ namespace en
   const char txt_others_tz[] PROGMEM = "Timezone";
   const char txt_others_tz_list[] PROGMEM = "See list";
   const char txt_others_ntp_server[] PROGMEM = "NTP Server";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Status";

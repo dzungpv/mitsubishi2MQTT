@@ -98,6 +98,7 @@ namespace vi
   const char txt_others_tz[] PROGMEM = "Múi giờ";
   const char txt_others_tz_list[] PROGMEM = "Xem danh sách";
   const char txt_others_ntp_server[] PROGMEM = "Máy chủ NTP";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Trạng thái";

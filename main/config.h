@@ -242,6 +242,9 @@ String ha_wide_vane_set_topic;
 String ha_state_topic;
 String ha_system_info_topic;
 String ha_system_set_topic;
+String ha_system_setting_info;
+String ha_system_setting_request;
+String ha_system_setting_respond;
 String ha_debug_pckts_topic;
 String ha_debug_pckts_set_topic;
 String ha_debug_logs_topic;
@@ -262,6 +265,8 @@ bool _debugModeLogs = false;
 // debug mode packets, when true, will send all packets received from the heatpump to topic heatpump_debug_packets_topic
 // this can also be set by sending "on" to heatpump_debug_set_topic
 bool _debugModePckts = false;
+
+bool _webPanelDisable = false; // when true allow disable webpanel when using mqtt
 
 // Customization
 const uint8_t min_temp = 16; // Minimum temperature, in your selected unit, check value from heatpump remote control

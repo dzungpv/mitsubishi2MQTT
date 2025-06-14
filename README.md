@@ -17,6 +17,7 @@ ESP8266/ESP32 module to control Mitsubishi Electric HVAC unit. Support control w
  - Web interface for configuration, status and control, firmware upgrade
  - Homeassistant autodiscovery and control with MQTT
  - Control with MQTT
+ - Web server can be disable/enable after MQTT connected
  - Multilanguages, user can change in SETUP->UNIT or choose in initial setup
 
 ***
@@ -40,11 +41,15 @@ The software and hardware has been tested by the author for 5 years on the follo
 
 <img src="https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/CN105_ESP8266.png"/>
 
-This circuit using by the author, here is some [boards](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/Before_Install.jpg) before install.
+This circuit using by the author (ESP8266), here is some [boards](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/Before_Install.jpg) before install.
+More pictures in [`hardware`](https://github.com/dzungpv/mitsubishi2MQTT/tree/master/hardware) folder.
 
-You can also use ESP-32 module for more processing power. If using ESP-32 by default app use UART0 (TX - GPIO 1, RX - GPIO 3)
-You can assign any compatible pin in the SETUP->OTHERS to use custom pin, example TX: 26, RX: 27, check ESP-32 manual for pin, when TX and RX set it will use UART1 port. Better not using UART0, it is default for logs and flash the chip.
-You can see more pictures in [`hardware`](https://github.com/dzungpv/mitsubishi2MQTT/tree/master/hardware) folder.
+You can also use `ESP32` module for more processing power:
+- If using ESP32 by default app use **UART0** (TX - GPIO 1, RX - GPIO 3)
+- You can assign any compatible pin in the SETUP->OTHERS to use custom pin, example TX: 26, RX: 27, check ESP-32 manual for pin.
+When TX and RX set it will use **UART1** port. 
+- Better not using UART0, it is default for logs and flash the chip.
+
 ***
 
 ## Attention:
@@ -123,6 +128,7 @@ The `topic` is: "mqtt_topic/mqtt_friendly_name"
 - topic/debug/logs/set on off
 - topic/custom/send as example "fc 42 01 30 10 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 7b " see https://github.com/SwiCago/HeatPump/blob/master/src/HeatPump.h
 - topic/system/set to control the device with commands: "restart": reboot the device, "factory": reset device to fatory state.
+- topic/system/opt/rqt with json data to change to Web Panel option. Payloads: {"options": {"webpanel": "Off" }} or {"options": {"webpanel": "On" } }
 ***
 
 ***

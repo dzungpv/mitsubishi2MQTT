@@ -32,7 +32,7 @@ bool loadOthers();
 void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const String& mqttUser, const String& mqttPwd, String mqttTopic, const String& mqttRootCaCert);
 void saveUnit(String tempUnit, String supportMode, String supportFanMode, String loginPassword, String tempStep, String languageIndex);
 void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd, const String& local_ip, const String& gw_ip, const String& subnet_ip, const String& dns_ip);
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz, const String &ntp);
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& webPanel, const String& txPin, const String& rxPin, const String& tz, const String &ntp);
 void saveCurrentOthers();
 void initCaptivePortal();
 void initMqtt();
@@ -197,8 +197,11 @@ void setup()
     ha_debug_logs_set_topic = main_topic + F("/debug/logs/set");
     //
     ha_state_topic = main_topic + F("/state");
-    ha_system_info_topic = main_topic + F("/system/info"); // for device info
-    ha_system_set_topic = main_topic + F("/system/set"); // for control over mqtt
+    ha_system_info_topic = main_topic + F("/system/info");          // for device info
+    ha_system_set_topic = main_topic + F("/system/set");            // for control over mqtt
+    ha_system_setting_info = main_topic + F("/system/info");        // for control over mqtt
+    ha_system_setting_request = main_topic + F("/system/opt/rqt");  // for control over mqtt
+    ha_system_setting_respond = main_topic + F("/system/opt/rps");  // for control over mqtt
     ha_custom_packet = main_topic + F("/custom/send");
     ha_availability_topic = main_topic + F("/availability");
     //
@@ -219,40 +222,40 @@ void setup()
     // write_log("Starting Mitsubishi2MQTT");
     MDNS.begin(hostname); // DNS service for .local address access
     // Web interface
-    server.on("/", handleRoot);
-    server.on("/control", handleControl);
-    server.on("/setup", handleSetup);
-    server.on("/mqtt", handleMqtt);
-    server.on("/wifi", handleWifi);
-    server.on("/unit", handleUnit);
-    server.on("/status", handleStatus);
-    server.on("/others", handleOthers);
+    if (!_webPanelDisable) {
+        server.on("/", handleRoot);
+        server.on("/control", handleControl);
+        server.on("/setup", handleSetup);
+        server.on("/mqtt", handleMqtt);
+        server.on("/wifi", handleWifi);
+        server.on("/unit", handleUnit);
+        server.on("/status", handleStatus);
+        server.on("/others", handleOthers);
 #ifdef METRICS
-    server.on("/metrics", handleMetrics);
+        server.on("/metrics", handleMetrics);
 #endif
-    server.onNotFound(handleNotFound);
-    if (login_password.length() > 0)
-    {
-      server.on("/login", handleLogin);
-    }
-    if (!isSecureEnable())
-    {
-      server.on("/upgrade", handleUpgrade);
-      server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
+        server.onNotFound(handleNotFound);
+        if (login_password.length() > 0) {
+            server.on("/login", handleLogin);
+        }
+        if (!isSecureEnable()) {
+            server.on("/upgrade", handleUpgrade);
+            server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
-      Update.onProgress(otaUpdateProgress);
+            Update.onProgress(otaUpdateProgress);
 #endif
-    }
-    // web socket
+        }
+        // web socket
 #ifdef WEBSOCKET_ENABLE
-    ws.onEvent(onWsEvent);
-    server.addHandler(&ws);
+        ws.onEvent(onWsEvent);
+        server.addHandler(&ws);
 #endif
-    // event source client
-    events.onConnect([](AsyncEventSourceClient *client)
-                     { client->send("hello!", NULL, millis(), 1000); });
-    server.addHandler(&events);
-    server.begin();
+        // event source client
+        events.onConnect([](AsyncEventSourceClient *client) { client->send("hello!", NULL, millis(), 1000); });
+        server.addHandler(&events);
+        server.begin();
+    }
+
     ESP_LOGD(TAG, "Connection to HVAC. Stop serial log.");
     // write_log("Connection to HVAC");
     lastMqttRetry = 0;
@@ -569,7 +572,7 @@ bool loadOthers()
     return false;
   }
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
+  const size_t capacity = JSON_OBJECT_SIZE(10) + 401;
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, configFile);
   // unit
@@ -580,6 +583,7 @@ bool loadOthers()
   String haa = doc["haa"].as<String>();
   String debugPckts = doc["debugPckts"].as<String>();
   String debugLogs = doc["debugLogs"].as<String>();
+  String webPanel = doc["webPanel"].as<String>();
   if (strcmp(haa.c_str(), "OFF") == 0)
   {
     others_haa = false;
@@ -591,6 +595,10 @@ bool loadOthers()
   if (strcmp(debugLogs.c_str(), "ON") == 0)
   {
     _debugModeLogs = true;
+  }
+  if (strcmp(webPanel.c_str(), "OFF") == 0)
+  {
+    _webPanelDisable = true;
   }
   // custom tx rx pin
   if (doc.containsKey("txPin") && doc.containsKey("rxPin")) // check key to prevent data is "null" if not exist
@@ -724,15 +732,16 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   configFile.close();
 }
 
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz, const String &ntp)
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& webPanel, const String& txPin, const String& rxPin, const String& tz, const String &ntp)
 {
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
+  const size_t capacity = JSON_OBJECT_SIZE(10) + 401;
   DynamicJsonDocument doc(capacity);
   doc["haa"] = haa;
   doc["haat"] = haat;
   doc["debugPckts"] = debugPckts;
   doc["debugLogs"] = debugLogs;
+  doc["webPanel"] = webPanel;
   doc["txPin"] = txPin;
   doc["rxPin"] = rxPin;
   doc["tz"] = tz;
@@ -751,7 +760,8 @@ void saveCurrentOthers()
   String haa = others_haa ? "ON" : "OFF";
   String debugPckts = _debugModePckts ? "ON" : "OFF";
   String debugLogs = _debugModeLogs ? "ON" : "OFF";
-  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, String(HP_TX), String(HP_RX), timezone, ntpServer);
+  String webPanel= _webPanelDisable ? "OFF" : "ON";
+  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, webPanel, String(HP_TX), String(HP_RX), timezone, ntpServer);
 }
 
 // Initialize captive portal page
@@ -1201,7 +1211,7 @@ void handleOthers(AsyncWebServerRequest *request)
   checkLogin(request);
   if (request->hasArg("save"))
   {
-    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
+    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("web_p"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
     saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_m_save)));
@@ -1218,6 +1228,7 @@ void handleOthers(AsyncWebServerRequest *request)
     othersPage.replace(F("_TXT_OTHERS_HATOPIC_"), translatedWord(FL_(txt_others_hatopic)));
     othersPage.replace(F("_TXT_OTHERS_DEBUG_PCKTS_"), translatedWord(FL_(txt_others_debug_packets)));
     othersPage.replace(F("_TXT_OTHERS_DEBUG_LOGS_"), translatedWord(FL_(txt_others_debug_log)));
+    othersPage.replace(F("_TXT_OTHERS_WEB_PANEL_"), translatedWord(FL_(txt_others_web_panel)));
     othersPage.replace(F("_TXT_OTHERS_TIME_ZONE_"), translatedWord(FL_(txt_others_tz)));
     othersPage.replace(F("_TXT_OTHER_NTP_SERVER_"), translatedWord(FL_(txt_others_ntp_server)));
     othersPage.replace(F("_SEE_TZ_LIST"), translatedWord(FL_(txt_others_tz_list)));
@@ -1227,6 +1238,12 @@ void handleOthers(AsyncWebServerRequest *request)
     othersPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
     othersPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
     othersPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+    // disable web panel if MQTT not set or not connected to prevent accident disable
+    if (!mqtt_config || !mqtt_connected) {
+        othersPage.replace(F("_WEB_PN_EN_"), F("disabled"));
+    } else {
+        othersPage.replace(F("_WEB_PN_EN_"), F(""));
+    }
     // set data
     othersPage.replace(F("_HAA_TOPIC_"), others_haa_topic);
     othersPage.replace(F("_TX_PIN_"), String(HP_TX));
@@ -1256,6 +1273,14 @@ void handleOthers(AsyncWebServerRequest *request)
     else
     {
       othersPage.replace(F("_DEBUG_LOGS_OFF_"), F("selected"));
+    }
+    if (_webPanelDisable)
+    {
+      othersPage.replace(F("_WEB_OFF_"), F("selected"));
+    }
+    else
+    {
+      othersPage.replace(F("_WEB_ON_"), F("selected"));
     }
     sendWrappedHTML(request, othersPage);
   }
@@ -2577,6 +2602,46 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
 
     hp.sendCustomPacket(bytes, byteCount);
   }
+  else if (strcmp(topic, ha_system_setting_request.c_str()) == 0) // We receive command for board
+  {
+      // Allocate document capacity.
+      const size_t capacity = JSON_OBJECT_SIZE(3) + 121;
+      DynamicJsonDocument doc(capacity);
+      // Deserialize the JSON document
+      DeserializationError error = deserializeJson(doc, message);
+      // Test if parsing succeeds.
+      if (!error) {
+          if (doc.containsKey("options")) {
+              JsonObject options = doc["options"];
+              if (options.containsKey("webpanel")) {
+                  String webPanel = doc["options"]["webpanel"];
+                  ESP_LOGI(TAG, "Web panel option: %s", webPanel.c_str());
+                  if (webPanel == "On" || webPanel == "Off") {
+                      bool new_web_panel_disable = false;
+                      if (webPanel == "On") {
+                          new_web_panel_disable = false;
+                      }
+                      if (webPanel == "Off") {
+                          new_web_panel_disable = true;
+                      }
+                      if (_webPanelDisable != new_web_panel_disable) {
+                          ESP_LOGI(TAG, "Set Webpanel option and reboot");
+                          _webPanelDisable = new_web_panel_disable;
+                          saveCurrentOthers();
+                          sendRebootRequest(5);
+                          mqttClient->publish(ha_system_setting_respond.c_str(), 1, false, message);
+                      } else {
+                          ESP_LOGE(TAG, "Set Web panel option do nothing");
+                      }
+                  } else {
+                      ESP_LOGE(TAG, "Web panel Invalid option");
+                  }
+              }
+          }
+      } else {
+          ESP_LOGE(TAG, "Error decode json data");
+      }
+  }
   else
   {
     String msg("heatpump: wrong mqtt topic: ");
@@ -2793,6 +2858,35 @@ void haConfigButton(byte tag_id, String payload_press, String icon)
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
+void haConfigOption(uint8_t tag_id, String icon) {
+    const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
+    DynamicJsonDocument haConfig(capacity);
+
+    haConfig[F("icon")] = icon;
+    haConfig[F("name")] = getEntityName(tag_id);
+    // Set unique ID and value template
+    String tag = getEntityTag(tag_id);
+    haConfig[F("unique_id")] = getId() + "_" + tag;
+    haConfig[F("command_template")] = "{\"options\": {\"" + tag + "\": \"{{ value }}\" } }";
+    haConfig[F("command_topic")] = ha_system_setting_request;
+
+    JsonArray haConfigOptions = haConfig[F("options")].to<JsonArray>();
+    if (tag_id == ENT_WEB_PANEL) {
+        haConfigOptions.add("On");
+        haConfigOptions.add("Off");
+    }
+    haConfig[F("state_topic")] = ha_system_setting_info;
+    haConfig[F("value_template")] = "{{ value_json." + tag + " }}";
+    haConfig[F("entity_category")] = F("config");
+
+    haConfigureDevice(haConfig);
+
+    String mqttOutput;
+    serializeJson(haConfig, mqttOutput);
+    String ha_config_topic = haGetConfigTopic("select", tag);
+    mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
+}
+
 void sendDeviceInfo()
 {
   // send HA config packet for device info
@@ -2814,6 +2908,7 @@ void sendDeviceInfo()
   haConfigInfo[getEntityTag(ENT_RSSI)] = String(WiFi.RSSI());
   haConfigInfo[getEntityTag(ENT_BSSI)] = getWifiBSSID();
   haConfigInfo[getEntityTag(ENT_UP_TIME)] = getUpTimeSeconds();
+  haConfigInfo[getEntityTag(ENT_WEB_PANEL)] = _webPanelDisable ? "Off" : "On";
 
   String mqttOutput;
   serializeJson(haConfigInfo, mqttOutput);
@@ -2938,6 +3033,7 @@ void sendHaConfig()
   haConfigSensor(ENT_FREE_HEAP, "%", "mdi:memory", true);
   haConfigSensor(ENT_RSSI, "dBm", "mdi:network-strength-1", true);
   haConfigSensor(ENT_BSSI, "", "mdi:router-wireless", true);
+  haConfigOption(ENT_WEB_PANEL, "mdi:cog");
 }
 
 void mqttConnect()
@@ -3352,6 +3448,7 @@ void onMqttConnect(bool sessionPresent)
   mqtt_connected = true;
 
   mqttClient->subscribe(ha_system_set_topic.c_str(), 1);
+  mqttClient->subscribe(ha_system_setting_request.c_str(), 1);
   mqttClient->subscribe(ha_debug_pckts_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_debug_logs_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_mode_set_topic.c_str(), 1);

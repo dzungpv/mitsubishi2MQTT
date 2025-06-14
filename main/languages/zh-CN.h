@@ -98,6 +98,7 @@ namespace zh
   const char txt_others_tz[] PROGMEM = "时区";
   const char txt_others_tz_list[] PROGMEM = "查看列表";
   const char txt_others_ntp_server[] PROGMEM = "NTP 服务器";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "状态";
