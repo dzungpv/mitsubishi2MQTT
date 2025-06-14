@@ -792,6 +792,8 @@ void initCaptivePortal()
   server.on("/", handleInitSetup);
   server.on("/save", handleSaveWifiAndMqtt);
   server.on("/reboot", handleReboot);
+  server.on("/others", handleOthers);
+  server.on("/unit", handleUnit);
   server.on("/control", handleControl);
   server.on("/status", handleStatus);
   if (!isSecureEnable())
@@ -1239,7 +1241,7 @@ void handleOthers(AsyncWebServerRequest *request)
     othersPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
     othersPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     // disable web panel if MQTT not set or not connected to prevent accident disable
-    if (!mqtt_config || !mqtt_connected) {
+    if ((!mqtt_config || !mqtt_connected) && !captive) {
         othersPage.replace(F("_WEB_PN_EN_"), F("disabled"));
     } else {
         othersPage.replace(F("_WEB_PN_EN_"), F(""));
