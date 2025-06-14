@@ -2087,11 +2087,11 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
     hp.setSettings(settings);
     if (hp.getSettings() == hp.getWantedSettings()) // only update it settings change
     {
-      ESP_LOGW(TAG, F("Same Settings to HP, Igrore"));
+      ESP_LOGW(TAG, "Same Settings to HP, Igrore");
     }
     else
     {
-      ESP_LOGI(TAG, F("Send Settings to HP"));
+      ESP_LOGI(TAG, "Send Settings to HP");
       requestHpUpdate = true;
       requestHpUpdateTime = millis() + 10;
     }
