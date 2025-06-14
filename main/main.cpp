@@ -2600,34 +2600,34 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
 
 // Lookup tables for Tag lookup
 static const char* const entityTagLUT[MAX_ENTITY_ID + 1] = {
-    /* 0 */ F("room_temperature"),
-    /* 1 */ F("connection_state"),
-    /* 2 */ F("up_time"),
-    /* 3 */ F("free_heap"),
-    /* 4 */ F("rssi"),
-    /* 5 */ F("bssi"),
-    /* 6 */ F("compressor_freq"),
-    /* 7 */ F("restart"),
-    /* 8 */ F("webpanel"),};
+    /* 0 */ "room_temperature",
+    /* 1 */ "connection_state",
+    /* 2 */ "up_time",
+    /* 3 */ "free_heap",
+    /* 4 */ "rssi",
+    /* 5 */ "bssi",
+    /* 6 */ "compressor_freq",
+    /* 7 */ "restart",
+    /* 8 */ "webpanel"};
 
 // Lookup tables for Name lookup
 static const char* const entityNameLUT[MAX_ENTITY_ID + 1] = {
-    /* 0 */ F("Room Temperature"),
-    /* 1 */ F("Connection state"),
-    /* 2 */ F("Up Time"),
-    /* 3 */ F("Free Heap"),
-    /* 4 */ F("RSSI"),
-    /* 5 */ F("BSSI"),
-    /* 6 */ F("Compressor Freq"),
-    /* 7 */ F("Restart"),
-    /* 8 */ F("WebPanel")};
+    /* 0 */ "Room Temperature",
+    /* 1 */ "Connection state",
+    /* 2 */ "Up Time",
+    /* 3 */ "Free Heap",
+    /* 4 */ "RSSI",
+    /* 5 */ "BSSI",
+    /* 6 */ "Compressor Freq",
+    /* 7 */ "Restart",
+    /* 8 */ "WebPanel"};
 
 //Fast lookup functions for Tag
 const char* getEntityTag(byte tag_id) {
     if (tag_id <= MAX_ENTITY_ID) {
         return entityTagLUT[tag_id];
     }
-    return F("unknown");
+    return "unknown";
 }
 
 //Fast lookup functions for Name
@@ -2635,7 +2635,7 @@ const char* getEntityName(byte tag_id) {
     if (tag_id <= MAX_ENTITY_ID) {
         return entityNameLUT[tag_id];
     }
-    return F("Unknown");
+    return "Unknown";
 }
 
 String haGetConfigTopic(String entity_type, String entity_tag = "")
