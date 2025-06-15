@@ -998,7 +998,7 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   toSend.replace(F("_UNIT_NAME_"), hostname);
   toSend.replace(F("_VERSION_"), getAppVersion());
   toSend.replace(F("_APP_NAME_"), appName);
-  request->send(200, "text/html", toSend.c_str());
+  request->send_P(200, "text/html", toSend.c_str());
   headerContent = "";
   footerContent = "";
 }
