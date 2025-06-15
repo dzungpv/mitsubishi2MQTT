@@ -995,10 +995,6 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   if (content.isEmpty())
     return;
 
-  String header = FPSTR(html_common_header);
-  header.replace(F("_APP_NAME_"), appName);
-  header.replace(F("_UNIT_NAME_"), hostname);
-
   String footer = FPSTR(html_common_footer);
   footer.replace(F("_APP_NAME_"), appName);
   footer.replace(F("_UNIT_NAME_"), hostname);
@@ -1009,23 +1005,31 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   String hardware = String(ARDUINO_BOARD);
 #endif
   footer.replace(F("_VERSION_"), getAppVersion() + F(" (") + hardware + F(")"));
-  
+
+  String response = FPSTR(html_common_header);
+  response.replace(F("_APP_NAME_"), appName);
+  response.replace(F("_UNIT_NAME_"), hostname);
+
+#ifdef ESP32
+  response += content;
+  response += footer;
+  request->send(200, "text/html", response);
+#else
   if (html_response != NULL)
   {
     delete[] html_response; // cleanup memory when send completed
     html_response = NULL;
   }
-
-  html_resp_length = header.length() + content.length() + footer.length();
+  html_resp_length = response.length() + content.length() + footer.length();
   html_response = new char[html_resp_length + 1];
-  memcpy(html_response, header.c_str(), header.length());
-  u_int16_t index = header.length();
+  memcpy(html_response, response.c_str(), response.length());
+  u_int16_t index = response.length();
   memcpy(html_response + index, content.c_str(), content.length());
   index += content.length();
   memcpy(html_response + index, footer.c_str(), footer.length());
   html_response[html_resp_length] = '\0';
-
   request->send_P(200, "text/html", html_response);
+#endif
 }
 
 void handleNotFound(AsyncWebServerRequest *request)
@@ -2758,7 +2762,8 @@ void haConfigureDevice(DynamicJsonDocument &haConfig)
   haConfigDevice[F("hw")] = hardware;
   haConfigDevice[F("mdl")] = model;
   haConfigDevice[F("mf")] = manufacturer;
-  haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
+  if (!_webPanelDisable)
+    haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
 
   // availability topic
   haConfig[F("avty_t")] = ha_availability_topic;
