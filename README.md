@@ -44,9 +44,12 @@ The software and hardware has been tested by the author for 5 years on the follo
 This circuit using by the author (ESP8266), here is some [boards](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/Before_Install.jpg) before install.
 More pictures in [`hardware`](https://github.com/dzungpv/mitsubishi2MQTT/tree/master/hardware) folder.
 
-You can also use `ESP32` module for more processing power:
-- If using ESP32 by default app use **UART0** (TX - GPIO 1, RX - GPIO 3)
-- You can assign any compatible pin in the SETUP->OTHERS to use custom pin, example TX: 26, RX: 27, check ESP-32 manual for pin.
+You can also use `ESP32` (including ESP32-S2, ESP32-S3 and ESP32-C3) module for more processing power:
+- ESP32 by default app use **UART0** (TX - GPIO 1, RX - GPIO 3)
+- ESP32-S2 by default app use **UART0** (TX - GPIO 43, RX - GPIO 44)
+- ESP32-S3 by default app use **UART0** (TX - GPIO 43, RX - GPIO 44)
+- ESP32-C3 by default app use **UART0** (TX - GPIO 21, RX - GPIO 20)
+- You can assign any compatible pin in the SETUP->OTHERS to use custom pin, example TX: 26, RX: 27, check ESP32 manual for pin.
 When TX and RX set it will use **UART1** port. 
 - Better not using UART0, it is default for logs and flash the chip.
 
@@ -94,16 +97,18 @@ Nightly builds are available for select platforms via GitHub Actions. Go to [the
 ***
 
 ## How to build code from source:
-  - ESP IDF (Recomended): clone the project with --recursive tag: ```git clone https://github.com/dzungpv/mitsubishi2MQTT.git --recursive```, Install [ESP IDF 4.4.6 ](https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/get-started/index.html) set the target and run command to build: ```idf.py build```, flash to the chip with command: ```idf.py flash```
+  - ESP IDF (Recomended): clone the project with --recursive tag: ```git clone https://github.com/dzungpv/mitsubishi2MQTT.git --recursive```, Install [ESP IDF 4.4.6 ](https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/get-started/index.html),
+  set the target ```idf.py set-target esp32|esp32s2|esp32s3|esp32c3```, and run command to build: ```idf.py build```, flash to the chip with command: ```idf.py flash```
   - Arduino: Intall require libraries (name and path in platformio.ini), rename file main.cpp in main folder to main.ino, open it and build
   - Platformio: Install, open it and choose a variant to build
 
 ***
 ## How to flash pre-build bin file:
-### ESP32
- - Download latest release bin file `mitsubishi2MQTT_ESP32DEV_IDF.bin.zip` and exact it.
- - Flash `mitsubishi2MQTT_ESP32DEV_IDF.bin` with esptool.py with command: ```esptool.py -p PORT -b 460800 --before default_reset --after no_reset --chip esp32 write_flash --flash_mode dio --flash_size keep --flash_freq 40m 0x0 mitsubishi2MQTT_ESP32DEV_IDF.bin```
- - If you do not want to install EspTool, just use EspTool web with Chrome or Edge browser here: https://espressif.github.io/esptool-js/, after connected, choose file: `mitsubishi2MQTT_ESP32DEV_IDF.bin` and then enter `Flash Address` 0x0 and press `Program`.
+### ESP32, ESP32-S2, ESP32-S3 and ESP32-C3
+ - Download latest release bin file `mitsubishi2MQTT_ESP32_IDF.bin.zip` for ESP32 and exact it.
+ - Flash `mitsubishi2MQTT_ESP32_IDF.bin` with esptool.py with command: ```esptool.py -p PORT -b 460800 --before default_reset --after no_reset --chip esp32 write_flash --flash_mode dio --flash_size keep --flash_freq 40m 0x0 mitsubishi2MQTT_ESP32_IDF.bin```
+ - If you do not want to install EspTool, just use EspTool web with Chrome or Edge browser here: https://espressif.github.io/esptool-js/, after connected, choose file: `mitsubishi2MQTT_ESP32_IDF.bin` and then enter `Flash Address` 0x0 and press `Program`.
+ - With ESP32-S2, ESP32-S3 and ESP32-C3, replace `ESP32` with ESP32S2, ESP32S3, ESP32C3 in file name and command above to flash it.
 ### ESP8266:
  - Download latest release bin file `mitsubishi2MQTT_WEMOS_D1_Mini.bin.zip` or `mitsubishi2MQTT_ESP8266-ESP01.bin` and exact it.
  - Flash `mitsubishi2MQTT_WEMOS_D1_Mini.bin` with esptool.py with command: ```esptool.py -b 460800 --before default_reset --after no_reset --chip esp8266 write_flash --flash_mode dio --flash_size keep 0x0 mitsubishi2MQTT_WEMOS_D1_Mini.bin```

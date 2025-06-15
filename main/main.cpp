@@ -3286,7 +3286,7 @@ void loop()
       {
         lastHpSync = millis();
         // If we've retried more than the max number of tries, keep retrying at that fixed interval, which is several minutes.
-        hpConnectionRetries = min(hpConnectionRetries + 1u, HP_MAX_RETRIES);
+        hpConnectionRetries = min((uint32_t)(hpConnectionRetries + 1u), HP_MAX_RETRIES);
         hpConnectionTotalRetries++;
         hp.sync();
       }
