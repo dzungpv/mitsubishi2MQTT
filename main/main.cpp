@@ -2756,7 +2756,8 @@ void haConfigureDevice(DynamicJsonDocument &haConfig)
   haConfigDevice[F("hw")] = String(ARDUINO_BOARD);  
   haConfigDevice[F("mdl")] = model;
   haConfigDevice[F("mf")] = manufacturer;
-  haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
+  if (!_webPanelDisable)
+    haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
 
   // availability topic
   haConfig[F("avty_t")] = ha_availability_topic;
