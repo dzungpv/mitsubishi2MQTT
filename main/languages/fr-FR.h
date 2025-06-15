@@ -98,6 +98,7 @@ namespace fr
   const char txt_others_tz[] PROGMEM = "Fuseau horaire";
   const char txt_others_tz_list[] PROGMEM = "Voir la liste";
   const char txt_others_ntp_server[] PROGMEM = "Serveur NTP";
+  const char txt_others_web_panel[] PROGMEM = "Web Panel";
 
   // Page Status
   const char txt_status_title[] PROGMEM = "Etats";

@@ -58,6 +58,7 @@ AsyncEventSource events("/events"); // Create an Event Source on /events
 #include <Ticker.h>   // for LED status (Using a Wemos D1-Mini)
 #include "time.h"     // time lib
 
+#ifdef ESP32
 // Let Encrypt isrgrootx1.pem
 const char rootCA_LE[] = R"====(
 -----BEGIN CERTIFICATE-----
@@ -92,6 +93,7 @@ mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
 emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----
 )====";
+#endif
 
 // wifi, mqtt and heatpump client instances
 MqttClient* mqttClient = nullptr; // espMqttClient support both in secure and secure mqtt
@@ -136,6 +138,7 @@ unsigned long lastRemoteTemp;
 StaticJsonDocument<JSON_OBJECT_SIZE(12)> rootInfo;
 String wifi_list = "";                            // cache wifi scan result
 const String localApIpUrl = "http://192.168.4.1"; // a string version of the local IP with http, used for redirecting clients to your webpage
+String unique_id = "";                            // cache board unique id
 
 // Web OTA
 int uploaderror = 0;
@@ -153,7 +156,7 @@ unsigned long requestWifiScanTime = 0;
 #define WIFI_SCAN_PERIOD 120000
 unsigned lastWifiScanMillis;
 
-const PROGMEM char *m2mqtt_version = "2024.08.28";
+const PROGMEM char *m2mqtt_version = "2025.06.15";
 
 // Define global variables for files
 int HP_TX = 0; // variable for the ESP32 custom TX pin, 0 is the defautl and it use hardware serial 0
@@ -184,6 +187,7 @@ const PROGMEM char *model = "HVAC MITSUBISHI";
 const PROGMEM char *hostnamePrefix = "HVAC-";
 static const char *const TAG = "mitsu_cn105";
 
+
 unsigned long wifi_timeout;
 unsigned long wifi_reconnect_timeout;
 unsigned long mqtt_reconnect_timeout;
@@ -199,10 +203,16 @@ String wifi_static_gateway_ip;
 String wifi_static_subnet;
 String wifi_static_dns_ip;
 
+// HTML Response
+char* html_response = NULL;
+unsigned int html_resp_length = 0;
+
 // time and time zone
 String ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
+const time_t min_valid_date = 1748000000;  // min time to consider device date valid
+time_t device_boot_time = 0;
 
 // Define global variables for MQTT
 String mqtt_fn;
@@ -223,24 +233,26 @@ String timezone = "ICT-7"; // Set timezone to Vietnam Standard Time
 
 // Define global variables for HA topics
 String ha_power_set_topic;
-String ha_system_set_topic;
 String ha_mode_set_topic;
 String ha_temp_set_topic;
 String ha_remote_temp_set_topic;
 String ha_fan_set_topic;
 String ha_vane_set_topic;
 String ha_wide_vane_set_topic;
-String ha_settings_topic;
-String ha_system_setting_info;
 String ha_state_topic;
+String ha_system_info_topic;
+String ha_system_set_topic;
+String ha_system_setting_info;
+String ha_system_setting_request;
+String ha_system_setting_respond;
 String ha_debug_pckts_topic;
 String ha_debug_pckts_set_topic;
 String ha_debug_logs_topic;
 String ha_debug_logs_set_topic;
-String ha_config_topic;
 String ha_discovery_topic;
 String ha_custom_packet;
 String ha_availability_topic;
+String ha_birth_topic;
 String hvac_name;
 
 // login
@@ -253,6 +265,8 @@ bool _debugModeLogs = false;
 // debug mode packets, when true, will send all packets received from the heatpump to topic heatpump_debug_packets_topic
 // this can also be set by sending "on" to heatpump_debug_set_topic
 bool _debugModePckts = false;
+
+bool _webPanelDisable = false; // when true allow disable webpanel when using mqtt
 
 // Customization
 const uint8_t min_temp = 16; // Minimum temperature, in your selected unit, check value from heatpump remote control
@@ -324,6 +338,18 @@ const char *const language_names[] = {
     "Català"
 };
 #endif
+
+const byte ENT_ROOM_TEMPERATURE = 0;
+const byte ENT_CONNECTION_STATE = 1;
+const byte ENT_UP_TIME = 2;
+const byte ENT_FREE_HEAP = 3;
+const byte ENT_RSSI = 4;
+const byte ENT_BSSI = 5;
+const byte ENT_COMPR_FRQ = 6;
+const byte ENT_RESTART_BTN = 7;
+const byte ENT_WEB_PANEL = 8;
+
+const byte MAX_ENTITY_ID = ENT_WEB_PANEL;
 
 static constexpr uint8_t NUM_LANGUAGES = sizeof(languages) / sizeof(const char *);
 

@@ -31,8 +31,8 @@ bool loadUnit();
 bool loadOthers();
 void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const String& mqttUser, const String& mqttPwd, String mqttTopic, const String& mqttRootCaCert);
 void saveUnit(String tempUnit, String supportMode, String supportFanMode, String loginPassword, String tempStep, String languageIndex);
-void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd);
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin);
+void saveWifi(String apSsid, const String& apPwd, String hostName, const String& otaPwd, const String& local_ip, const String& gw_ip, const String& subnet_ip, const String& dns_ip);
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& webPanel, const String& txPin, const String& rxPin, const String& tz, const String &ntp);
 void saveCurrentOthers();
 void initCaptivePortal();
 void initMqtt();
@@ -59,7 +59,6 @@ void handleUploadDone(AsyncWebServerRequest *request);
 void handleUploadLoop(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final);
 void write_log(const String& log);
 heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings settings);
-void readHeatPumpSettings();
 void hpSettingsChanged();
 String hpGetMode(heatpumpSettings hpSettings);
 String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings);
@@ -76,7 +75,8 @@ float toCelsius(float fromFahrenheit);
 float convertCelsiusToLocalUnit(float temperature, bool isFahrenheit);
 float convertLocalUnitToCelsius(float temperature, bool isFahrenheit);
 String getTemperatureScale();
-String getId();
+String getMacAddr(bool keepSeparator = true);
+const String& getId();
 bool is_authenticated(AsyncWebServerRequest *request);
 void checkLogin(AsyncWebServerRequest *request);
 // AsyncMQTT
@@ -108,8 +108,11 @@ bool isSecureEnable();
 String getBuildDatetime();
 String getAppVersion();
 void initNVS();
-String getUpTime();
 String getCurrentTime();
+time_t getUpTimeSeconds();
+String getUpTime();
+uint32_t getFreeHeapBytes();
+uint32_t getTotalHeapBytes();
 void tick(); // led blink tick
 void factoryReset();
 void otaUpdateProgress(size_t prg, size_t sz);
@@ -117,6 +120,8 @@ String getFanModeFromHa(String modeFromHa);
 String getFanModeFromHp(String modeFromHp);
 String getWifiBSSID();
 void sendDeviceInfo();
+const char* getEntityTag(byte tag_id);
+const char* getEntityName(byte tag_id);
 // End  header for build with IDF and Platformio
 
 #ifdef ESP8266
@@ -131,6 +136,8 @@ void setup()
 {
   // Start serial for debug before HVAC connect to serial
   Serial.begin(115200);
+  wifi_list.reserve(200);
+  unique_id.reserve(15);
 #ifdef ESP32
   Serial.setDebugOutput(true);
   initNVS();
@@ -174,33 +181,31 @@ void setup()
   {
     // write_log("Starting MQTT");
     //  setup HA topics
-    ha_power_set_topic = mqtt_topic + "/" + mqtt_fn + "/power/set";
-    ha_mode_set_topic = mqtt_topic + "/" + mqtt_fn + "/mode/set";
-    ha_temp_set_topic = mqtt_topic + "/" + mqtt_fn + "/temp/set";
-    ha_remote_temp_set_topic = mqtt_topic + "/" + mqtt_fn + "/remote_temp/set";
-    ha_fan_set_topic = mqtt_topic + "/" + mqtt_fn + "/fan/set";
-    ha_vane_set_topic = mqtt_topic + "/" + mqtt_fn + "/vane/set";
-    ha_wide_vane_set_topic = mqtt_topic + "/" + mqtt_fn + "/wide-vane/set";
-    ha_settings_topic = mqtt_topic + "/" + mqtt_fn + "/settings";
-    ha_state_topic = mqtt_topic + "/" + mqtt_fn + "/state";
+    String main_topic = mqtt_topic + F("/") + mqtt_fn;
+    
+    ha_power_set_topic = main_topic + F("/power/set");
+    ha_mode_set_topic = main_topic + F("/mode/set");
+    ha_temp_set_topic = main_topic + F("/temp/set");
+    ha_remote_temp_set_topic = main_topic + F("/remote_temp/set");
+    ha_fan_set_topic = main_topic + F("/fan/set");
+    ha_vane_set_topic = main_topic + F("/vane/set");
+    ha_wide_vane_set_topic = main_topic + F("/wide-vane/set");
     //
-    ha_system_setting_info = mqtt_topic + "/" + mqtt_fn + "/system/info"; // for device info
-    ha_debug_pckts_topic = mqtt_topic + "/" + mqtt_fn + "/debug/packets";
-    ha_debug_pckts_set_topic = mqtt_topic + "/" + mqtt_fn + "/debug/packets/set";
-    ha_debug_logs_topic = mqtt_topic + "/" + mqtt_fn + "/debug/logs";
-    ha_debug_logs_set_topic = mqtt_topic + "/" + mqtt_fn + "/debug/logs/set";
+    ha_debug_pckts_topic = main_topic + F("/debug/packets");
+    ha_debug_pckts_set_topic = main_topic + F("/debug/packets/set");
+    ha_debug_logs_topic = main_topic + F("/debug/logs");
+    ha_debug_logs_set_topic = main_topic + F("/debug/logs/set");
     //
-    ha_custom_packet = mqtt_topic + "/" + mqtt_fn + "/custom/send";
-    ha_availability_topic = mqtt_topic + "/" + mqtt_fn + "/availability";
-    ha_system_set_topic = mqtt_topic + "/" + mqtt_fn + "/system/set"; // for control over mqtt
-    if (others_haa)
-    {
-      ha_config_topic = others_haa_topic + "/climate/" + mqtt_fn + "/config";
-    }
-    else
-    {
-      ha_config_topic = "homeassistant/climate/" + mqtt_fn + "/config";
-    }
+    ha_state_topic = main_topic + F("/state");
+    ha_system_info_topic = main_topic + F("/system/info");          // for device info
+    ha_system_set_topic = main_topic + F("/system/set");            // for control over mqtt
+    ha_system_setting_info = main_topic + F("/system/info");        // for control over mqtt
+    ha_system_setting_request = main_topic + F("/system/opt/rqt");  // for control over mqtt
+    ha_system_setting_respond = main_topic + F("/system/opt/rps");  // for control over mqtt
+    ha_custom_packet = main_topic + F("/custom/send");
+    ha_availability_topic = main_topic + F("/availability");
+    //
+    ha_birth_topic = (others_haa ? others_haa_topic : F("homeassistant")) + F("/status");
     // startup mqtt connection
     initMqtt();
   }
@@ -217,40 +222,40 @@ void setup()
     // write_log("Starting Mitsubishi2MQTT");
     MDNS.begin(hostname); // DNS service for .local address access
     // Web interface
-    server.on("/", handleRoot);
-    server.on("/control", handleControl);
-    server.on("/setup", handleSetup);
-    server.on("/mqtt", handleMqtt);
-    server.on("/wifi", handleWifi);
-    server.on("/unit", handleUnit);
-    server.on("/status", handleStatus);
-    server.on("/others", handleOthers);
+    if (!_webPanelDisable) {
+        server.on("/", handleRoot);
+        server.on("/control", handleControl);
+        server.on("/setup", handleSetup);
+        server.on("/mqtt", handleMqtt);
+        server.on("/wifi", handleWifi);
+        server.on("/unit", handleUnit);
+        server.on("/status", handleStatus);
+        server.on("/others", handleOthers);
 #ifdef METRICS
-    server.on("/metrics", handleMetrics);
+        server.on("/metrics", handleMetrics);
 #endif
-    server.onNotFound(handleNotFound);
-    if (login_password.length() > 0)
-    {
-      server.on("/login", handleLogin);
-    }
-    if (!isSecureEnable())
-    {
-      server.on("/upgrade", handleUpgrade);
-      server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
+        server.onNotFound(handleNotFound);
+        if (login_password.length() > 0) {
+            server.on("/login", handleLogin);
+        }
+        if (!isSecureEnable()) {
+            server.on("/upgrade", handleUpgrade);
+            server.on("/upload", WebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
-      Update.onProgress(otaUpdateProgress);
+            Update.onProgress(otaUpdateProgress);
 #endif
-    }
-    // web socket
+        }
+        // web socket
 #ifdef WEBSOCKET_ENABLE
-    ws.onEvent(onWsEvent);
-    server.addHandler(&ws);
+        ws.onEvent(onWsEvent);
+        server.addHandler(&ws);
 #endif
-    // event source client
-    events.onConnect([](AsyncEventSourceClient *client)
-                     { client->send("hello!", NULL, millis(), 1000); });
-    server.addHandler(&events);
-    server.begin();
+        // event source client
+        events.onConnect([](AsyncEventSourceClient *client) { client->send("hello!", NULL, millis(), 1000); });
+        server.addHandler(&events);
+        server.begin();
+    }
+
     ESP_LOGD(TAG, "Connection to HVAC. Stop serial log.");
     // write_log("Connection to HVAC");
     lastMqttRetry = 0;
@@ -276,18 +281,7 @@ void setup()
 #else
     hp.connect(&Serial);
 #endif
-    hp.setFastSync(true); // enable fast sync because we are not care about timer nad other package
-    heatpumpStatus currentStatus = hp.getStatus();
-    heatpumpSettings currentSettings = hp.getSettings();
-    rootInfo["roomTemperature"] = convertCelsiusToLocalUnit(currentStatus.roomTemperature, useFahrenheit);
-    rootInfo["temperature"] = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-    rootInfo["fan"] = getFanModeFromHp(currentSettings.fan);
-    rootInfo["vane"] = currentSettings.vane;
-    rootInfo["wideVane"] = currentSettings.wideVane;
-    rootInfo["mode"] = hpGetMode(currentSettings);
-    rootInfo["action"] = hpGetAction(currentStatus, currentSettings);
-    rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
-    lastTempSend = millis();
+    hp.setFastSync(true); // enable fast sync because we are not care about timer and other package
     MDNS.addService("http", "tcp", 80);
   }
   else
@@ -578,7 +572,7 @@ bool loadOthers()
     return false;
   }
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
+  const size_t capacity = JSON_OBJECT_SIZE(10) + 401;
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, configFile);
   // unit
@@ -589,6 +583,7 @@ bool loadOthers()
   String haa = doc["haa"].as<String>();
   String debugPckts = doc["debugPckts"].as<String>();
   String debugLogs = doc["debugLogs"].as<String>();
+  String webPanel = doc["webPanel"].as<String>();
   if (strcmp(haa.c_str(), "OFF") == 0)
   {
     others_haa = false;
@@ -600,6 +595,10 @@ bool loadOthers()
   if (strcmp(debugLogs.c_str(), "ON") == 0)
   {
     _debugModeLogs = true;
+  }
+  if (strcmp(webPanel.c_str(), "OFF") == 0)
+  {
+    _webPanelDisable = true;
   }
   // custom tx rx pin
   if (doc.containsKey("txPin") && doc.containsKey("rxPin")) // check key to prevent data is "null" if not exist
@@ -642,7 +641,7 @@ void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const Stri
   }
   if (mqttTopic.isEmpty())
   {
-    // set default topic
+    // set default topic if empty
     mqttTopic += getId();
     mqttTopic.toLowerCase();
   }
@@ -733,15 +732,16 @@ void saveWifi(String apSsid, const String& apPwd, String hostName, const String&
   configFile.close();
 }
 
-void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& txPin, const String& rxPin, const String& tz, const String &ntp)
+void saveOthers(const String& haa, const String& haat, const String& debugPckts, const String& debugLogs, const String& webPanel, const String& txPin, const String& rxPin, const String& tz, const String &ntp)
 {
   // Allocate document capacity.
-  const size_t capacity = JSON_OBJECT_SIZE(9) + 366;
+  const size_t capacity = JSON_OBJECT_SIZE(10) + 401;
   DynamicJsonDocument doc(capacity);
   doc["haa"] = haa;
   doc["haat"] = haat;
   doc["debugPckts"] = debugPckts;
   doc["debugLogs"] = debugLogs;
+  doc["webPanel"] = webPanel;
   doc["txPin"] = txPin;
   doc["rxPin"] = rxPin;
   doc["tz"] = tz;
@@ -760,7 +760,8 @@ void saveCurrentOthers()
   String haa = others_haa ? "ON" : "OFF";
   String debugPckts = _debugModePckts ? "ON" : "OFF";
   String debugLogs = _debugModeLogs ? "ON" : "OFF";
-  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, String(HP_TX), String(HP_RX), timezone, ntpServer);
+  String webPanel= _webPanelDisable ? "OFF" : "ON";
+  saveOthers(haa, others_haa_topic, debugPckts, debugLogs, webPanel, String(HP_TX), String(HP_RX), timezone, ntpServer);
 }
 
 // Initialize captive portal page
@@ -791,6 +792,8 @@ void initCaptivePortal()
   server.on("/", handleInitSetup);
   server.on("/save", handleSaveWifiAndMqtt);
   server.on("/reboot", handleReboot);
+  server.on("/others", handleOthers);
+  server.on("/unit", handleUnit);
   server.on("/control", handleControl);
   server.on("/status", handleStatus);
   if (!isSecureEnable())
@@ -987,20 +990,36 @@ boolean initWifi()
 }
 
 // Handler webserver response
-
 void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
 {
-  String headerContent = FPSTR(html_common_header);
-  String footerContent = FPSTR(html_common_footer);
-  String toSend(headerContent);
-  toSend += content;
-  toSend += footerContent;
-  toSend.replace(F("_UNIT_NAME_"), hostname);
-  toSend.replace(F("_VERSION_"), getAppVersion());
-  toSend.replace(F("_APP_NAME_"), appName);
-  request->send_P(200, "text/html", toSend.c_str());
-  headerContent = "";
-  footerContent = "";
+  if (content.isEmpty())
+    return;
+
+  String header = FPSTR(html_common_header);
+  header.replace(F("_APP_NAME_"), appName);
+  header.replace(F("_UNIT_NAME_"), hostname);
+
+  String footer = FPSTR(html_common_footer);
+  footer.replace(F("_APP_NAME_"), appName);
+  footer.replace(F("_UNIT_NAME_"), hostname);
+  footer.replace(F("_VERSION_"), getAppVersion() + F(" (") + String(ARDUINO_BOARD) + F(")"));
+
+  if (html_response != NULL)
+  {
+    delete[] html_response; // cleanup memory when send completed
+    html_response = NULL;
+  }
+
+  html_resp_length = header.length() + content.length() + footer.length();
+  html_response = new char[html_resp_length + 1];
+  memcpy(html_response, header.c_str(), header.length());
+  u_int16_t index = header.length();
+  memcpy(html_response + index, content.c_str(), content.length());
+  index += content.length();
+  memcpy(html_response + index, footer.c_str(), footer.length());
+  html_response[html_resp_length] = '\0';
+
+  request->send_P(200, "text/html", html_response);
 }
 
 void handleNotFound(AsyncWebServerRequest *request)
@@ -1045,8 +1064,8 @@ void handleSaveWifiAndMqtt(AsyncWebServerRequest *request)
   String countDown = FPSTR(count_down_script_init);
   countDown.replace(F("_HOST_NAME_"), hostname + ".local");
   // localize
-  initSavePage.replace("_TXT_INIT_REBOOT_MES_1_", translatedWord(FL_(txt_init_reboot_mes_1)));
-  initSavePage.replace("_TXT_INIT_REBOOT_MES_", translatedWord(FL_(txt_init_reboot_mes)));
+  initSavePage.replace(F("_TXT_INIT_REBOOT_MES_1_"), translatedWord(FL_(txt_init_reboot_mes_1)));
+  initSavePage.replace(F("_TXT_INIT_REBOOT_MES_"), translatedWord(FL_(txt_init_reboot_mes)));
   sendWrappedHTML(request, initSavePage + countDown);
   sendRebootRequest(2); // Reboot after 1 seconds
 }
@@ -1057,7 +1076,7 @@ void handleReboot(AsyncWebServerRequest *request)
   ESP_LOGD(TAG, "Rebooting");
   String initRebootPage = FPSTR(html_init_reboot);
   // localize
-  initRebootPage.replace("_TXT_INIT_REBOOT_", translatedWord(FL_(txt_init_reboot)));
+  initRebootPage.replace(F("_TXT_INIT_REBOOT_"), translatedWord(FL_(txt_init_reboot)));
   sendWrappedHTML(request, initRebootPage);
   sendRebootRequest(3); // Reboot after 3 seconds
 }
@@ -1070,7 +1089,7 @@ void handleRoot(AsyncWebServerRequest *request)
     String rebootPage = FPSTR(html_page_reboot);
     String countDown = FPSTR(count_down_script);
     // localize
-    rebootPage.replace("_TXT_M_REBOOT_", translatedWord(FL_(txt_m_reboot)));
+    rebootPage.replace(F("_TXT_M_REBOOT_"), translatedWord(FL_(txt_m_reboot)));
     sendWrappedHTML(request, rebootPage + countDown);
     sendRebootRequest(3); // Reboot after 3 seconds
   }
@@ -1078,13 +1097,13 @@ void handleRoot(AsyncWebServerRequest *request)
   {
     String menuRootPage = FPSTR(html_menu_root);
     // localize
-    menuRootPage.replace("_TXT_HOME_PAGE_", translatedWord(FL_(txt_home_page)));
-    menuRootPage.replace("_TXT_CONTROL_", translatedWord(FL_(txt_control)));
-    menuRootPage.replace("_TXT_SETUP_", translatedWord(FL_(txt_setup)));
-    menuRootPage.replace("_TXT_STATUS_", translatedWord(FL_(txt_status)));
-    menuRootPage.replace("_TXT_FW_UPGRADE_", translatedWord(FL_(txt_firmware_upgrade)));
-    menuRootPage.replace("_TXT_REBOOT_", translatedWord(FL_(txt_reboot)));
-    menuRootPage.replace("_TXT_LOGOUT_", translatedWord(FL_(txt_logout)));
+    menuRootPage.replace(F("_TXT_HOME_PAGE_"), translatedWord(FL_(txt_home_page)));
+    menuRootPage.replace(F("_TXT_CONTROL_"), translatedWord(FL_(txt_control)));
+    menuRootPage.replace(F("_TXT_SETUP_"), translatedWord(FL_(txt_setup)));
+    menuRootPage.replace(F("_TXT_STATUS_"), translatedWord(FL_(txt_status)));
+    menuRootPage.replace(F("_TXT_FW_UPGRADE_"), translatedWord(FL_(txt_firmware_upgrade)));
+    menuRootPage.replace(F("_TXT_REBOOT_"), translatedWord(FL_(txt_reboot)));
+    menuRootPage.replace(F("_TXT_LOGOUT_"), translatedWord(FL_(txt_logout)));
     // set data
     menuRootPage.replace(F("_SHOW_LOGOUT_"), (String)(login_password.length() > 0));
     // not show control button if hp not connected
@@ -1099,27 +1118,27 @@ void handleInitSetup(AsyncWebServerRequest *request)
   String initSetupPage = FPSTR(html_init_setup);
   String unitScriptWs = FPSTR(unit_script_ws);
   // localize
-  initSetupPage.replace("_TXT_INIT_TITLE_", translatedWord(FL_(txt_init_title)));
-  initSetupPage.replace("_TXT_WIFI_TITLE_", translatedWord(FL_(txt_wifi_title)));
-  initSetupPage.replace("_TXT_UNIT_LANGUAGE_", translatedWord(FL_(txt_unit_language)));
-  initSetupPage.replace("_TXT_WIFI_SSID_ENTER_", translatedWord(FL_(txt_wifi_ssid_enter)));
-  initSetupPage.replace("_TXT_WIFI_SSID_SELECT_", translatedWord(FL_(txt_wifi_ssid_select)));
-  initSetupPage.replace("_TXT_WIFI_SSID_", translatedWord(FL_(txt_wifi_ssid)));
-  initSetupPage.replace("_TXT_WIFI_PSK_", translatedWord(FL_(txt_wifi_psk)));
-  initSetupPage.replace("_TXT_WIFI_STATIC_IP_", translatedWord(FL_(txt_wifi_static_ip)));
-  initSetupPage.replace("_TXT_WIFI_STATIC_GW_", translatedWord(FL_(txt_wifi_static_gw)));
-  initSetupPage.replace("_TXT_WIFI_STATIC_MASK_", translatedWord(FL_(txt_wifi_static_mask)));
-  initSetupPage.replace("_TXT_WIFI_STATIC_DNS_", translatedWord(FL_(txt_wifi_static_dns)));
-  initSetupPage.replace("_TXT_MQTT_TITLE_", translatedWord(FL_(txt_mqtt_title)));
-  initSetupPage.replace("_TXT_MQTT_PH_USER_", translatedWord(FL_(txt_mqtt_ph_user)));
-  initSetupPage.replace("_TXT_MQTT_PH_PWD_", translatedWord(FL_(txt_mqtt_ph_pwd)));
-  initSetupPage.replace("_TXT_MQTT_HOST_", translatedWord(FL_(txt_mqtt_host)));
-  initSetupPage.replace("_TXT_MQTT_PORT_DESC", translatedWord(FL_(txt_mqtt_port_desc)));
-  initSetupPage.replace("_TXT_MQTT_PORT_", translatedWord(FL_(txt_mqtt_port)));
-  initSetupPage.replace("_TXT_MQTT_USER_", translatedWord(FL_(txt_mqtt_user)));
-  initSetupPage.replace("_TXT_MQTT_PASSWORD_", translatedWord(FL_(txt_mqtt_password)));
-  initSetupPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
-  initSetupPage.replace("_TXT_FIRMWARE_UPGRADE_", translatedWord(FL_(txt_firmware_upgrade)));
+  initSetupPage.replace(F("_TXT_INIT_TITLE_"), translatedWord(FL_(txt_init_title)));
+  initSetupPage.replace(F("_TXT_WIFI_TITLE_"), translatedWord(FL_(txt_wifi_title)));
+  initSetupPage.replace(F("_TXT_UNIT_LANGUAGE_"), translatedWord(FL_(txt_unit_language)));
+  initSetupPage.replace(F("_TXT_WIFI_SSID_ENTER_"), translatedWord(FL_(txt_wifi_ssid_enter)));
+  initSetupPage.replace(F("_TXT_WIFI_SSID_SELECT_"), translatedWord(FL_(txt_wifi_ssid_select)));
+  initSetupPage.replace(F("_TXT_WIFI_SSID_"), translatedWord(FL_(txt_wifi_ssid)));
+  initSetupPage.replace(F("_TXT_WIFI_PSK_"), translatedWord(FL_(txt_wifi_psk)));
+  initSetupPage.replace(F("_TXT_WIFI_STATIC_IP_"), translatedWord(FL_(txt_wifi_static_ip)));
+  initSetupPage.replace(F("_TXT_WIFI_STATIC_GW_"), translatedWord(FL_(txt_wifi_static_gw)));
+  initSetupPage.replace(F("_TXT_WIFI_STATIC_MASK_"), translatedWord(FL_(txt_wifi_static_mask)));
+  initSetupPage.replace(F("_TXT_WIFI_STATIC_DNS_"), translatedWord(FL_(txt_wifi_static_dns)));
+  initSetupPage.replace(F("_TXT_MQTT_TITLE_"), translatedWord(FL_(txt_mqtt_title)));
+  initSetupPage.replace(F("_TXT_MQTT_PH_USER_"), translatedWord(FL_(txt_mqtt_ph_user)));
+  initSetupPage.replace(F("_TXT_MQTT_PH_PWD_"), translatedWord(FL_(txt_mqtt_ph_pwd)));
+  initSetupPage.replace(F("_TXT_MQTT_HOST_"), translatedWord(FL_(txt_mqtt_host)));
+  initSetupPage.replace(F("_TXT_MQTT_PORT_DESC"), translatedWord(FL_(txt_mqtt_port_desc)));
+  initSetupPage.replace(F("_TXT_MQTT_PORT_"), translatedWord(FL_(txt_mqtt_port)));
+  initSetupPage.replace(F("_TXT_MQTT_USER_"), translatedWord(FL_(txt_mqtt_user)));
+  initSetupPage.replace(F("_TXT_MQTT_PASSWORD_"), translatedWord(FL_(txt_mqtt_password)));
+  initSetupPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+  initSetupPage.replace(F("_TXT_FIRMWARE_UPGRADE_"), translatedWord(FL_(txt_firmware_upgrade)));
   // set the data
   // language
   String language_list;
@@ -1130,7 +1149,7 @@ void handleInitSetup(AsyncWebServerRequest *request)
     language_list += "'";
     if (i == system_language_index)
     {
-      language_list += "selected";
+      language_list += F("selected");
     }
     language_list += ">";
     language_list += language_names[i];
@@ -1166,8 +1185,8 @@ void handleSetup(AsyncWebServerRequest *request)
   {
     String resetPage = FPSTR(html_page_reset);
     // localize
-    resetPage.replace("_TXT_M_RESET_1_", translatedWord(FL_(txt_m_reset_1)));
-    resetPage.replace("_TXT_M_RESET_", translatedWord(FL_(txt_m_reset)));
+    resetPage.replace(F("_TXT_M_RESET_1_"), translatedWord(FL_(txt_m_reset_1)));
+    resetPage.replace(F("_TXT_M_RESET_"), translatedWord(FL_(txt_m_reset)));
     String countDown = FPSTR(count_down_script);
     sendWrappedHTML(request, resetPage + countDown);
     factoryReset();
@@ -1177,14 +1196,14 @@ void handleSetup(AsyncWebServerRequest *request)
   {
     String menuSetupPage = FPSTR(html_menu_setup);
     // localize
-    menuSetupPage.replace("_TXT_SETUP_PAGE_", translatedWord(FL_(txt_setup_page)));
-    menuSetupPage.replace("_TXT_MQTT_", translatedWord(FL_(txt_mqtt)));
-    menuSetupPage.replace("_TXT_WIFI_", translatedWord(FL_(txt_wifi)));
-    menuSetupPage.replace("_TXT_UNIT_", translatedWord(FL_(txt_unit)));
-    menuSetupPage.replace("_TXT_OTHERS_", translatedWord(FL_(txt_others)));
-    menuSetupPage.replace("_TXT_RESET_CONFIRM_", translatedWord(FL_(txt_reset_confirm)));
-    menuSetupPage.replace("_TXT_RESET_", translatedWord(FL_(txt_reset)));
-    menuSetupPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+    menuSetupPage.replace(F("_TXT_SETUP_PAGE_"), translatedWord(FL_(txt_setup_page)));
+    menuSetupPage.replace(F("_TXT_MQTT_"), translatedWord(FL_(txt_mqtt)));
+    menuSetupPage.replace(F("_TXT_WIFI_"), translatedWord(FL_(txt_wifi)));
+    menuSetupPage.replace(F("_TXT_UNIT_"), translatedWord(FL_(txt_unit)));
+    menuSetupPage.replace(F("_TXT_OTHERS_"), translatedWord(FL_(txt_others)));
+    menuSetupPage.replace(F("_TXT_RESET_CONFIRM_"), translatedWord(FL_(txt_reset_confirm)));
+    menuSetupPage.replace(F("_TXT_RESET_"), translatedWord(FL_(txt_reset)));
+    menuSetupPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     sendWrappedHTML(request, menuSetupPage);
   }
 }
@@ -1194,10 +1213,10 @@ void handleOthers(AsyncWebServerRequest *request)
   checkLogin(request);
   if (request->hasArg("save"))
   {
-    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
+    saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("web_p"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
-    saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
+    saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_m_save)));
     String countDown = FPSTR(count_down_script);
     sendWrappedHTML(request, saveRebootPage + countDown);
     sendRebootRequest(5); // Reboot after 5 seconds
@@ -1206,49 +1225,64 @@ void handleOthers(AsyncWebServerRequest *request)
   {
     String othersPage = FPSTR(html_page_others);
     // localize
-    othersPage.replace("_TXT_OTHERS_TITLE_", translatedWord(FL_(txt_others_title)));
-    othersPage.replace("_TXT_OTHERS_HAAUTO_", translatedWord(FL_(txt_others_haauto)));
-    othersPage.replace("_TXT_OTHERS_HATOPIC_", translatedWord(FL_(txt_others_hatopic)));
-    othersPage.replace("_TXT_OTHERS_DEBUG_PCKTS_", translatedWord(FL_(txt_others_debug_packets)));
-    othersPage.replace("_TXT_OTHERS_DEBUG_LOGS_", translatedWord(FL_(txt_others_debug_log)));
-    othersPage.replace("_TXT_OTHERS_TIME_ZONE_", translatedWord(FL_(txt_others_tz)));
-    othersPage.replace("_TXT_OTHER_NTP_SERVER_", translatedWord(FL_(txt_others_ntp_server)));
-    othersPage.replace("_SEE_TZ_LIST", translatedWord(FL_(txt_others_tz_list)));
-    othersPage.replace("_TXT_TX_PIN_", translatedWord(FL_(txt_others_tx_pin)));
-    othersPage.replace("_TXT_RX_PIN_", translatedWord(FL_(txt_others_rx_pin)));
-    othersPage.replace("_TXT_F_ON_", translatedWord(FL_(txt_f_on)));
-    othersPage.replace("_TXT_F_OFF_", translatedWord(FL_(txt_f_off)));
-    othersPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
-    othersPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+    othersPage.replace(F("_TXT_OTHERS_TITLE_"), translatedWord(FL_(txt_others_title)));
+    othersPage.replace(F("_TXT_OTHERS_HAAUTO_"), translatedWord(FL_(txt_others_haauto)));
+    othersPage.replace(F("_TXT_OTHERS_HATOPIC_"), translatedWord(FL_(txt_others_hatopic)));
+    othersPage.replace(F("_TXT_OTHERS_DEBUG_PCKTS_"), translatedWord(FL_(txt_others_debug_packets)));
+    othersPage.replace(F("_TXT_OTHERS_DEBUG_LOGS_"), translatedWord(FL_(txt_others_debug_log)));
+    othersPage.replace(F("_TXT_OTHERS_WEB_PANEL_"), translatedWord(FL_(txt_others_web_panel)));
+    othersPage.replace(F("_TXT_OTHERS_TIME_ZONE_"), translatedWord(FL_(txt_others_tz)));
+    othersPage.replace(F("_TXT_OTHER_NTP_SERVER_"), translatedWord(FL_(txt_others_ntp_server)));
+    othersPage.replace(F("_SEE_TZ_LIST"), translatedWord(FL_(txt_others_tz_list)));
+    othersPage.replace(F("_TXT_TX_PIN_"), translatedWord(FL_(txt_others_tx_pin)));
+    othersPage.replace(F("_TXT_RX_PIN_"), translatedWord(FL_(txt_others_rx_pin)));
+    othersPage.replace(F("_TXT_F_ON_"), translatedWord(FL_(txt_f_on)));
+    othersPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
+    othersPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+    othersPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+    // disable web panel if MQTT not set or not connected to prevent accident disable
+    if ((!mqtt_config || !mqtt_connected) && !captive) {
+        othersPage.replace(F("_WEB_PN_EN_"), F("disabled"));
+    } else {
+        othersPage.replace(F("_WEB_PN_EN_"), F(""));
+    }
     // set data
-    othersPage.replace("_HAA_TOPIC_", others_haa_topic);
-    othersPage.replace("_TX_PIN_", String(HP_TX));
-    othersPage.replace("_RX_PIN_", String(HP_RX));
-    othersPage.replace("_TIME_ZONE_", timezone);
-    othersPage.replace("_NTP_SERVER_", String(ntpServer));
+    othersPage.replace(F("_HAA_TOPIC_"), others_haa_topic);
+    othersPage.replace(F("_TX_PIN_"), String(HP_TX));
+    othersPage.replace(F("_RX_PIN_"), String(HP_RX));
+    othersPage.replace(F("_TIME_ZONE_"), timezone);
+    othersPage.replace(F("_NTP_SERVER_"), String(ntpServer));
     if (others_haa)
     {
-      othersPage.replace("_HAA_ON_", "selected");
+      othersPage.replace(F("_HAA_ON_"), F("selected"));
     }
     else
     {
-      othersPage.replace("_HAA_OFF_", "selected");
+      othersPage.replace(F("_HAA_OFF_"), F("selected"));
     }
     if (_debugModePckts)
     {
-      othersPage.replace("_DEBUG_PCKTS_ON_", "selected");
+      othersPage.replace(F("_DEBUG_PCKTS_ON_"), F("selected"));
     }
     else
     {
-      othersPage.replace("_DEBUG_PCKTS_OFF_", "selected");
+      othersPage.replace(F("_DEBUG_PCKTS_OFF_"), F("selected"));
     }
     if (_debugModeLogs)
     {
-      othersPage.replace("_DEBUG_LOGS_ON_", "selected");
+      othersPage.replace(F("_DEBUG_LOGS_ON_"), F("selected"));
     }
     else
     {
-      othersPage.replace("_DEBUG_LOGS_OFF_", "selected");
+      othersPage.replace(F("_DEBUG_LOGS_OFF_"), F("selected"));
+    }
+    if (_webPanelDisable)
+    {
+      othersPage.replace(F("_WEB_OFF_"), F("selected"));
+    }
+    else
+    {
+      othersPage.replace(F("_WEB_ON_"), F("selected"));
     }
     sendWrappedHTML(request, othersPage);
   }
@@ -1262,7 +1296,7 @@ void handleMqtt(AsyncWebServerRequest *request)
     saveMqtt(request->arg("fn"), request->arg("mh"), request->arg("ml"), request->arg("mu"), request->arg("mp"), request->arg("mt"), request->arg("mrcc"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
-    saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
+    saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_m_save)));
     String countDown = FPSTR(count_down_script);
     sendWrappedHTML(request, saveRebootPage + countDown);
     sendRebootRequest(5); // Reboot after 5 seconds
@@ -1271,21 +1305,21 @@ void handleMqtt(AsyncWebServerRequest *request)
   {
     String mqttPage = FPSTR(html_page_mqtt);
     // localize
-    mqttPage.replace("_TXT_MQTT_TITLE_", translatedWord(FL_(txt_mqtt_title)));
-    mqttPage.replace("_TXT_MQTT_FN_DESC_", translatedWord(FL_(txt_mqtt_fn_desc)));
-    mqttPage.replace("_TXT_MQTT_FN_", translatedWord(FL_(txt_mqtt_fn)));
-    mqttPage.replace("_TXT_MQTT_PH_USER_", translatedWord(FL_(txt_mqtt_ph_user)));
-    mqttPage.replace("_TXT_MQTT_PH_PWD_", translatedWord(FL_(txt_mqtt_ph_pwd)));
-    mqttPage.replace("_TXT_MQTT_PH_TOPIC_", translatedWord(FL_(txt_mqtt_ph_topic)));
-    mqttPage.replace("_TXT_MQTT_HOST_", translatedWord(FL_(txt_mqtt_host)));
-    mqttPage.replace("_TXT_MQTT_PORT_DESC_", translatedWord(FL_(txt_mqtt_port_desc)));
-    mqttPage.replace("_TXT_MQTT_PORT_", translatedWord(FL_(txt_mqtt_port)));
-    mqttPage.replace("_TXT_MQTT_USER_", translatedWord(FL_(txt_mqtt_user)));
-    mqttPage.replace("_TXT_MQTT_PASSWORD_", translatedWord(FL_(txt_mqtt_password)));
-    mqttPage.replace("_TXT_MQTT_TOPIC_", translatedWord(FL_(txt_mqtt_topic)));
-    mqttPage.replace("_TXT_MQTT_ROOT_CA_CERT_", translatedWord(FL_(txt_mqtt_root_ca_cert)));
-    mqttPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
-    mqttPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+    mqttPage.replace(F("_TXT_MQTT_TITLE_"), translatedWord(FL_(txt_mqtt_title)));
+    mqttPage.replace(F("_TXT_MQTT_FN_DESC_"), translatedWord(FL_(txt_mqtt_fn_desc)));
+    mqttPage.replace(F("_TXT_MQTT_FN_"), translatedWord(FL_(txt_mqtt_fn)));
+    mqttPage.replace(F("_TXT_MQTT_PH_USER_"), translatedWord(FL_(txt_mqtt_ph_user)));
+    mqttPage.replace(F("_TXT_MQTT_PH_PWD_"), translatedWord(FL_(txt_mqtt_ph_pwd)));
+    mqttPage.replace(F("_TXT_MQTT_PH_TOPIC_"), translatedWord(FL_(txt_mqtt_ph_topic)));
+    mqttPage.replace(F("_TXT_MQTT_HOST_"), translatedWord(FL_(txt_mqtt_host)));
+    mqttPage.replace(F("_TXT_MQTT_PORT_DESC_"), translatedWord(FL_(txt_mqtt_port_desc)));
+    mqttPage.replace(F("_TXT_MQTT_PORT_"), translatedWord(FL_(txt_mqtt_port)));
+    mqttPage.replace(F("_TXT_MQTT_USER_"), translatedWord(FL_(txt_mqtt_user)));
+    mqttPage.replace(F("_TXT_MQTT_PASSWORD_"), translatedWord(FL_(txt_mqtt_password)));
+    mqttPage.replace(F("_TXT_MQTT_TOPIC_"), translatedWord(FL_(txt_mqtt_topic)));
+    mqttPage.replace(F("_TXT_MQTT_ROOT_CA_CERT_"), translatedWord(FL_(txt_mqtt_root_ca_cert)));
+    mqttPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+    mqttPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     // set data
     mqttPage.replace(F("_MQTT_FN_"), mqtt_fn);
     mqttPage.replace(F("_MQTT_HOST_"), mqtt_server);
@@ -1310,7 +1344,7 @@ void handleUnit(AsyncWebServerRequest *request)
       saveUnit(request->arg("tu"), request->arg("md"), request->arg("mdf"), loginPassword, request->arg("temp_step"), request->arg("language"));
       String saveRebootPage = FPSTR(html_page_save_reboot);
       // localize
-      saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
+      saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_m_save)));
       String countDown = FPSTR(count_down_script);
       sendWrappedHTML(request, saveRebootPage + countDown);
       sendRebootRequest(5); // Reboot after 5 seconds
@@ -1319,34 +1353,35 @@ void handleUnit(AsyncWebServerRequest *request)
     {
       String saveRebootPage = FPSTR(html_page_save_reboot);
       // localize
-      saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_unit_password_not_match)));
+      saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_unit_password_not_match)));
       String countDown = FPSTR(count_down_script);
       sendWrappedHTML(request, saveRebootPage + countDown);
     }
   }
   else
   {
-    String unitPage = FPSTR(html_page_unit);
-    String unitScriptWs = FPSTR(unit_script_ws);
+    String unitPage = FPSTR(unit_script_ws);
+    unitPage.replace(F("_TXT_UNIT_PASSWORD_NOT_MATCH_"), translatedWord(FL_(txt_unit_password_not_match)));
+
+    unitPage += FPSTR(html_page_unit);
     // localize
-    unitPage.replace("_TXT_UNIT_TITLE_", translatedWord(FL_(txt_unit_title)));
-    unitPage.replace("_TXT_UNIT_LANGUAGE_", translatedWord(FL_(txt_unit_language)));
-    unitPage.replace("_TXT_UNIT_TEMP_", translatedWord(FL_(txt_unit_temp)));
-    unitPage.replace("_TXT_UNIT_STEPTEMP_", translatedWord(FL_(txt_unit_steptemp)));
-    unitPage.replace("_TXT_UNIT_FAN_MODES_", translatedWord(FL_(txt_unit_fan_modes)));
-    unitPage.replace("_TXT_UNIT_FAN_MODES_", translatedWord(FL_(txt_unit_fan_modes)));
-    unitPage.replace("_TXT_UNIT_MODES_", translatedWord(FL_(txt_unit_modes)));
-    unitPage.replace("_TXT_UNIT_LOGIN_USERNAME_", translatedWord(FL_(txt_unit_login_username)));
-    unitScriptWs.replace("_TXT_UNIT_PASSWORD_NOT_MATCH_", translatedWord(FL_(txt_unit_password_not_match)));
-    unitPage.replace("_TXT_UNIT_PASSWORD_CONFIRM_", translatedWord(FL_(txt_unit_password_confirm)));
-    unitPage.replace("_TXT_UNIT_PASSWORD_", translatedWord(FL_(txt_unit_password)));
-    unitPage.replace("_TXT_F_CELSIUS_", translatedWord(FL_(txt_f_celsius)));
-    unitPage.replace("_TXT_F_FH_", translatedWord(FL_(txt_f_fh)));
-    unitPage.replace("_TXT_F_ALLMODES_", translatedWord(FL_(txt_f_allmodes)));
-    unitPage.replace("_TXT_F_NOHEAT_", translatedWord(FL_(txt_f_noheat)));
-    unitPage.replace("_TXT_F_NOQUIET_", translatedWord(FL_(txt_f_noquiet)));
-    unitPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
-    unitPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+    unitPage.replace(F("_TXT_UNIT_TITLE_"), translatedWord(FL_(txt_unit_title)));
+    unitPage.replace(F("_TXT_UNIT_LANGUAGE_"), translatedWord(FL_(txt_unit_language)));
+    unitPage.replace(F("_TXT_UNIT_TEMP_"), translatedWord(FL_(txt_unit_temp)));
+    unitPage.replace(F("_TXT_UNIT_STEPTEMP_"), translatedWord(FL_(txt_unit_steptemp)));
+    unitPage.replace(F("_TXT_UNIT_FAN_MODES_"), translatedWord(FL_(txt_unit_fan_modes)));
+    unitPage.replace(F("_TXT_UNIT_FAN_MODES_"), translatedWord(FL_(txt_unit_fan_modes)));
+    unitPage.replace(F("_TXT_UNIT_MODES_"), translatedWord(FL_(txt_unit_modes)));
+    unitPage.replace(F("_TXT_UNIT_LOGIN_USERNAME_"), translatedWord(FL_(txt_unit_login_username)));
+    unitPage.replace(F("_TXT_UNIT_PASSWORD_CONFIRM_"), translatedWord(FL_(txt_unit_password_confirm)));
+    unitPage.replace(F("_TXT_UNIT_PASSWORD_"), translatedWord(FL_(txt_unit_password)));
+    unitPage.replace(F("_TXT_F_CELSIUS_"), translatedWord(FL_(txt_f_celsius)));
+    unitPage.replace(F("_TXT_F_FH_"), translatedWord(FL_(txt_f_fh)));
+    unitPage.replace(F("_TXT_F_ALLMODES_"), translatedWord(FL_(txt_f_allmodes)));
+    unitPage.replace(F("_TXT_F_NOHEAT_"), translatedWord(FL_(txt_f_noheat)));
+    unitPage.replace(F("_TXT_F_NOQUIET_"), translatedWord(FL_(txt_f_noquiet)));
+    unitPage.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+    unitPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     // set data
     // language
     String language_list;
@@ -1357,7 +1392,7 @@ void handleUnit(AsyncWebServerRequest *request)
       language_list += "'";
       if (i == system_language_index)
       {
-        language_list += "selected";
+        language_list += F("selected");
       }
       language_list += ">";
       language_list += language_names[i];
@@ -1383,7 +1418,7 @@ void handleUnit(AsyncWebServerRequest *request)
       unitPage.replace(F("_MDF_NONQUIET_"), F("selected"));
     // login password
     unitPage.replace(F("_LOGIN_PASSWORD_"), login_password);
-    sendWrappedHTML(request, unitScriptWs + unitPage);
+    sendWrappedHTML(request, unitPage);
   }
 }
 
@@ -1401,7 +1436,7 @@ void handleWifi(AsyncWebServerRequest *request)
     saveWifi(ssid, request->arg("psk"), request->arg("hn"), request->arg("otapwd"), request->arg("stip"), request->arg("stgw"), request->arg("stmask"), request->arg("stdns"));
     String saveRebootPage = FPSTR(html_page_save_reboot);
     // localize
-    saveRebootPage.replace("_TXT_M_SAVE_", translatedWord(FL_(txt_m_save)));
+    saveRebootPage.replace(F("_TXT_M_SAVE_"), translatedWord(FL_(txt_m_save)));
     String countDown = FPSTR(count_down_script);
     sendWrappedHTML(request, saveRebootPage + countDown);
     sendRebootRequest(5); // reboot after 5 seconds
@@ -1413,22 +1448,23 @@ void handleWifi(AsyncWebServerRequest *request)
       requestWifiScan = true;
       requestWifiScanTime = millis() + 50;
     }
-    String wifiPage = FPSTR(html_page_wifi);
+
+    String wifiPageHtml = FPSTR(html_page_wifi);
     // localize
-    wifiPage.replace("_TXT_WIFI_TITLE_", translatedWord(FL_(txt_wifi_title)));
-    wifiPage.replace("_TXT_WIFI_HOST_DESC_", translatedWord(FL_(txt_wifi_hostname_desc)));
-    wifiPage.replace("_TXT_WIFI_HOST_", translatedWord(FL_(txt_wifi_hostname)));
-    wifiPage.replace("_TXT_WIFI_SSID_ENTER_", translatedWord(FL_(txt_wifi_ssid_enter)));
-    wifiPage.replace("_TXT_WIFI_SSID_SELECT_", translatedWord(FL_(txt_wifi_ssid_select)));
-    wifiPage.replace("_TXT_WIFI_SSID_", translatedWord(FL_(txt_wifi_ssid)));
-    wifiPage.replace("_TXT_WIFI_PSK_", translatedWord(FL_(txt_wifi_psk)));
-    wifiPage.replace("_TXT_WIFI_OTAP_", translatedWord(FL_(txt_wifi_otap)));
-    wifiPage.replace("_TXT_WIFI_STATIC_IP_", translatedWord(FL_(txt_wifi_static_ip)));
-    wifiPage.replace("_TXT_WIFI_STATIC_GW_", translatedWord(FL_(txt_wifi_static_gw)));
-    wifiPage.replace("_TXT_WIFI_STATIC_MASK_", translatedWord(FL_(txt_wifi_static_mask)));
-    wifiPage.replace("_TXT_WIFI_STATIC_DNS_", translatedWord(FL_(txt_wifi_static_dns)));
-    wifiPage.replace("_TXT_SAVE_", translatedWord(FL_(txt_save)));
-    wifiPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+    wifiPageHtml.replace(F("_TXT_WIFI_TITLE_"), translatedWord(FL_(txt_wifi_title)));
+    wifiPageHtml.replace(F("_TXT_WIFI_HOST_DESC_"), translatedWord(FL_(txt_wifi_hostname_desc)));
+    wifiPageHtml.replace(F("_TXT_WIFI_HOST_"), translatedWord(FL_(txt_wifi_hostname)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_ENTER_"), translatedWord(FL_(txt_wifi_ssid_enter)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_SELECT_"), translatedWord(FL_(txt_wifi_ssid_select)));
+    wifiPageHtml.replace(F("_TXT_WIFI_SSID_"), translatedWord(FL_(txt_wifi_ssid)));
+    wifiPageHtml.replace(F("_TXT_WIFI_PSK_"), translatedWord(FL_(txt_wifi_psk)));
+    wifiPageHtml.replace(F("_TXT_WIFI_OTAP_"), translatedWord(FL_(txt_wifi_otap)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_IP_"), translatedWord(FL_(txt_wifi_static_ip)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_GW_"), translatedWord(FL_(txt_wifi_static_gw)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_MASK_"), translatedWord(FL_(txt_wifi_static_mask)));
+    wifiPageHtml.replace(F("_TXT_WIFI_STATIC_DNS_"), translatedWord(FL_(txt_wifi_static_dns)));
+    wifiPageHtml.replace(F("_TXT_SAVE_"), translatedWord(FL_(txt_save)));
+    wifiPageHtml.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
     // set data
     String str_ap_ssid = ap_ssid;
     String str_ap_pwd = ap_pwd;
@@ -1437,39 +1473,47 @@ void handleWifi(AsyncWebServerRequest *request)
     str_ap_pwd.replace("'", F("&apos;"));
     str_ota_pwd.replace("'", F("&apos;"));
     // display wifi list
+    wifiPageHtml.replace(F("_UNIT_NAME_"), hostname);
     String wifiOptions = getWifiOptions(false);
     if (!wifiOptions.isEmpty())
     {
-      wifiPage.replace(F("_WIFI_OPTIONS_"), wifiOptions);
+      wifiPageHtml.replace(F("_WIFI_OPTIONS_"), wifiOptions);
     }
-    wifiPage.replace(F("_SSID_"), str_ap_ssid);
-    wifiPage.replace(F("_PSK_"), str_ap_pwd);
-    wifiPage.replace(F("_OTA_PWD_"), str_ota_pwd);
-    wifiPage.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
-    wifiPage.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
-    wifiPage.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
-    wifiPage.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
-    String fwCheckEvents = FPSTR(fw_check_script_events);
-    sendWrappedHTML(request, fwCheckEvents + wifiPage);
+    wifiPageHtml.replace(F("_SSID_"), str_ap_ssid);
+    wifiPageHtml.replace(F("_PSK_"), str_ap_pwd);
+    wifiPageHtml.replace(F("_OTA_PWD_"), str_ota_pwd);
+    wifiPageHtml.replace(F("_WIFI_STATIC_IP_"), wifi_static_ip);
+    wifiPageHtml.replace(F("_WIFI_STATIC_GW_"), wifi_static_gateway_ip);
+    wifiPageHtml.replace(F("_WIFI_STATIC_MASK_"), wifi_static_subnet);
+    wifiPageHtml.replace(F("_WIFI_STATIC_DNS_"), wifi_static_dns_ip);
+
+    String wifiPage = FPSTR(fw_check_script_events);
+    wifiPage += wifiPageHtml;
+    wifiPageHtml = "";
+
+    sendWrappedHTML(request, wifiPage);
   }
 }
 
 void handleStatus(AsyncWebServerRequest *request)
 {
+  uint32_t freeHeapBytes = getFreeHeapBytes();
+  uint32_t totalHeapBytes = getTotalHeapBytes();
   String statusPage = FPSTR(html_page_status);
+  
   // localize
-  statusPage.replace("_TXT_STATUS_TITLE_", translatedWord(FL_(txt_status_title)));
-  statusPage.replace("_TXT_STATUS_HVAC_", translatedWord(FL_(txt_status_hvac)));
-  statusPage.replace("_TXT_RETRIES_HVAC_", translatedWord(FL_(txt_retries_hvac)));
-  statusPage.replace("_TXT_STATUS_MQTT_", translatedWord(FL_(txt_status_mqtt)));
-  statusPage.replace("_TXT_STATUS_WIFI_IP_", translatedWord(FL_(txt_status_wifi_ip)));
-  statusPage.replace("_TXT_STATUS_WIFI_", translatedWord(FL_(txt_status_wifi)));
-  statusPage.replace("_TXT_BUILD_VERSION_", translatedWord(FL_(txt_build_version)));
-  statusPage.replace("_TXT_BUILD_DATE_", translatedWord(FL_(txt_build_date)));
-  statusPage.replace("_TXT_STATUS_FREEHEAP_", translatedWord(FL_(txt_status_freeheap)));
-  statusPage.replace("_TXT_CURRENT_TIME_", translatedWord(FL_(txt_current_time)));
-  statusPage.replace("_TXT_BOOT_TIME", translatedWord(FL_(txt_boot_time)));
-  statusPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+  statusPage.replace(F("_TXT_STATUS_TITLE_"), translatedWord(FL_(txt_status_title)));
+  statusPage.replace(F("_TXT_STATUS_HVAC_"), translatedWord(FL_(txt_status_hvac)));
+  statusPage.replace(F("_TXT_RETRIES_HVAC_"), translatedWord(FL_(txt_retries_hvac)));
+  statusPage.replace(F("_TXT_STATUS_MQTT_"), translatedWord(FL_(txt_status_mqtt)));
+  statusPage.replace(F("_TXT_STATUS_WIFI_IP_"), translatedWord(FL_(txt_status_wifi_ip)));
+  statusPage.replace(F("_TXT_STATUS_WIFI_"), translatedWord(FL_(txt_status_wifi)));
+  statusPage.replace(F("_TXT_BUILD_VERSION_"), translatedWord(FL_(txt_build_version)));
+  statusPage.replace(F("_TXT_BUILD_DATE_"), translatedWord(FL_(txt_build_date)));
+  statusPage.replace(F("_TXT_STATUS_FREEHEAP_"), translatedWord(FL_(txt_status_freeheap)));
+  statusPage.replace(F("_TXT_CURRENT_TIME_"), translatedWord(FL_(txt_current_time)));
+  statusPage.replace(F("_TXT_BOOT_TIME"), translatedWord(FL_(txt_boot_time)));
+  statusPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
   // set data
   if (request->hasArg("mrconn"))
     mqttConnect();
@@ -1479,7 +1523,7 @@ void handleStatus(AsyncWebServerRequest *request)
   String disconnected = F("<font color='red'><b>");
   disconnected += translatedWord(FL_(txt_status_disconnect));
   disconnected += F("</b>(_MQTT_REASON_)</font>");
-  disconnected.replace("_MQTT_REASON_", String(mqtt_disconnect_reason));
+  disconnected.replace(F("_MQTT_REASON_"), String(mqtt_disconnect_reason));
   if (hp.isConnected())
   {
     statusPage.replace(F("_HVAC_STATUS_"), connected);
@@ -1499,7 +1543,7 @@ void handleStatus(AsyncWebServerRequest *request)
   }
   else
   {
-    statusPage.replace(F("_WIFI_IP_"), "<font color='blue'><b>" + WiFi.localIP().toString() + "</b></font>");
+    statusPage.replace(F("_WIFI_IP_"), F("<font color='blue'><b>") + WiFi.localIP().toString() + F("</b></font>"));
   }
   if (mqttClient != nullptr && mqttClient->connected())
     statusPage.replace(F("_MQTT_STATUS_"), connected);
@@ -1507,26 +1551,110 @@ void handleStatus(AsyncWebServerRequest *request)
     statusPage.replace(F("_MQTT_STATUS_"), disconnected);
   statusPage.replace(F("_WIFI_STATUS_"), String(WiFi.RSSI()));
   statusPage.replace(F("_WIFI_BSSID_"), getWifiBSSID());
-  statusPage.replace(F("_WIFI_MAC_"), getId());
+  statusPage.replace(F("_WIFI_MAC_"), getMacAddr());
   statusPage.replace(F("_BUILD_VERSION_"), getAppVersion());
   statusPage.replace(F("_BUILD_DATE_"), getBuildDatetime());
-  // get free heap and percent
-#ifdef ESP32
-  uint32_t freeHeapBytes = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-  uint32_t totalHeapBytes = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
-#else
-  uint32_t freeHeapBytes = ESP.getFreeHeap();
-  uint32_t totalHeapBytes = 64000;
-#endif
+
+  // calculate free heap and percent
   float percentageHeapFree = freeHeapBytes * 100.0f / (float)totalHeapBytes;
   String heap(freeHeapBytes);
   heap += " (";
   heap += String(percentageHeapFree);
   heap += "% )";
   statusPage.replace(F("_FREE_HEAP_"), heap);
-  statusPage.replace(F("_CURRENT_TIME_"), "<font color='blue'><b>" + getCurrentTime() + "</b></font>");
-  statusPage.replace(F("_BOOT_TIME_"), "<font color='orange'><b>" + getUpTime() + "</b></font>");
+  statusPage.replace(F("_CURRENT_TIME_"), F("<font color='blue'><b>") + getCurrentTime() + F("</b></font>"));
+  statusPage.replace(F("_BOOT_TIME_"), F("<font color='orange'><b>") + getUpTime() + F("</b></font>"));
   sendWrappedHTML(request, statusPage);
+}
+
+String getSelectStatus(const String &curr_status, const String &status)
+{
+  if (curr_status.isEmpty())
+    return F("");
+  if (curr_status == status)
+    return F("selected");
+  return F("");
+}
+
+String getModeSelect(const String &curr_status)
+{
+  String modeSelect = FPSTR(html_page_control_mode);
+  modeSelect.replace(F("_TXT_CTRL_MODE_"), translatedWord(FL_(txt_ctrl_mode)));
+  modeSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  modeSelect.replace(F("_TXT_F_HEAT_"), translatedWord(FL_(txt_f_heat)));
+  modeSelect.replace(F("_TXT_F_DRY_"), translatedWord(FL_(txt_f_dry)));
+  modeSelect.replace(F("_TXT_F_COOL_"), translatedWord(FL_(txt_f_cool)));
+  modeSelect.replace(F("_TXT_F_FAN_"), translatedWord(FL_(txt_f_fan)));
+
+  modeSelect.replace(F("_MODE_H_"), getSelectStatus(curr_status, F("HEAT")));
+  modeSelect.replace(F("_MODE_D_"), getSelectStatus(curr_status, F("DRY")));
+  modeSelect.replace(F("_MODE_C_"), getSelectStatus(curr_status, F("COOL")));
+  modeSelect.replace(F("_MODE_F_"), getSelectStatus(curr_status, F("FAN")));
+  modeSelect.replace(F("_MODE_A_"), getSelectStatus(curr_status, F("AUTO")));
+
+  modeSelect.replace(F("_HEAT_HIDDEN_"), !supportHeatMode ? F("'hidden' style='display: none;' disabled"): F(""));
+
+  return modeSelect;
+}
+
+String getFanSelect(const String &curr_status)
+{
+  String fanSelect = FPSTR(html_page_control_fan);
+  fanSelect.replace(F("_TXT_CTRL_FAN_"), translatedWord(FL_(txt_ctrl_fan)));
+  fanSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  fanSelect.replace(F("_TXT_F_QUIET_"), translatedWord(FL_(txt_f_quiet)));
+  fanSelect.replace(F("_TXT_F_LOW_"), translatedWord(FL_(txt_f_low)));
+  fanSelect.replace(F("_TXT_F_MEDIUM_"), translatedWord(FL_(txt_f_medium)));
+  fanSelect.replace(F("_TXT_F_MIDDLE_"), translatedWord(FL_(txt_f_middle)));
+  fanSelect.replace(F("_TXT_F_HIGH_"), translatedWord(FL_(txt_f_high)));
+
+  fanSelect.replace(F("_FAN_A_"), getSelectStatus(curr_status, F("AUTO")));
+  fanSelect.replace(F("_FAN_Q_"), getSelectStatus(curr_status, F("QUIET")));
+  fanSelect.replace(F("_FAN_1_"), getSelectStatus(curr_status, F("1")));
+  fanSelect.replace(F("_FAN_2_"), getSelectStatus(curr_status, F("2")));
+  fanSelect.replace(F("_FAN_3_"), getSelectStatus(curr_status, F("3")));
+  fanSelect.replace(F("_FAN_4_"), getSelectStatus(curr_status, F("4")));
+
+  fanSelect.replace(F("_QUIET_HIDDEN_"), !supportQuietMode ? F("'hidden' style='display: none;' disabled"): F(""));
+
+  return fanSelect;
+}
+
+String getVaneSelect(const String &curr_status)
+{
+  String vaneSelect = FPSTR(html_page_control_vane);
+  vaneSelect.replace(F("_TXT_CTRL_VANE_"), translatedWord(FL_(txt_ctrl_vane)));
+  vaneSelect.replace(F("_TXT_F_AUTO_"), translatedWord(FL_(txt_f_auto)));
+  vaneSelect.replace(F("_TXT_F_SWING_"), translatedWord(FL_(txt_f_swing)));
+  vaneSelect.replace(F("_TXT_F_POS_"), translatedWord(FL_(txt_f_pos)));
+
+  vaneSelect.replace(F("_VANE_A_"), getSelectStatus(curr_status, F("AUTO")));
+  vaneSelect.replace(F("_VANE_1_"), getSelectStatus(curr_status, F("1")));
+  vaneSelect.replace(F("_VANE_2_"), getSelectStatus(curr_status, F("2")));
+  vaneSelect.replace(F("_VANE_3_"), getSelectStatus(curr_status, F("3")));
+  vaneSelect.replace(F("_VANE_4_"), getSelectStatus(curr_status, F("4")));
+  vaneSelect.replace(F("_VANE_5_"), getSelectStatus(curr_status, F("5")));
+  vaneSelect.replace(F("_VANE_S_"), getSelectStatus(curr_status, F("SWING")));
+
+  return vaneSelect;
+}
+
+String getWideVaneSelect(const String &curr_status)
+{
+  String wideVaneSelect = FPSTR(html_page_control_widevane);
+  wideVaneSelect.replace(F("_TXT_CTRL_WVANE_"), translatedWord(FL_(txt_ctrl_wvane)));
+  wideVaneSelect.replace(F("_TXT_F_SWING_"), translatedWord(FL_(txt_f_swing)));
+  wideVaneSelect.replace(F("_TXT_F_POS_"), translatedWord(FL_(txt_f_pos)));
+
+  wideVaneSelect.replace(F("_WVANE_1_"), getSelectStatus(curr_status, F("<<")));
+  wideVaneSelect.replace(F("_WVANE_2_"), getSelectStatus(curr_status, F("<")));
+  wideVaneSelect.replace(F("_WVANE_3_"), getSelectStatus(curr_status, F("|")));
+  wideVaneSelect.replace(F("_WVANE_4_"), getSelectStatus(curr_status, F(">")));
+  wideVaneSelect.replace(F("_WVANE_5_"), getSelectStatus(curr_status, F(">>")));
+  wideVaneSelect.replace(F("_WVANE_5_"), getSelectStatus(curr_status, F("<>")));
+  wideVaneSelect.replace(F("_WVANE_S_"), getSelectStatus(curr_status, F("SWING")));
+
+  return wideVaneSelect;
 }
 
 void handleControl(AsyncWebServerRequest *request)
@@ -1541,166 +1669,52 @@ void handleControl(AsyncWebServerRequest *request)
     request->send(response);
     return;
   }
+
   heatpumpSettings settings = hp.getSettings();
   settings = change_states(request, settings);
-  String controlPage = FPSTR(html_page_control);
-  String controlScript = FPSTR(control_script_events);
+
+  String controlPage = FPSTR(control_script_events);
+  controlPage = FPSTR(control_script_events);
+  controlPage.replace(F("_MIN_TEMP_"), String(convertCelsiusToLocalUnit(min_temp, useFahrenheit)));
+  controlPage.replace(F("_MAX_TEMP_"), String(convertCelsiusToLocalUnit(max_temp, useFahrenheit)));
+  controlPage.replace(F("_TEMP_STEP_"), String(temp_step));
+  controlPage.replace(F("_HEAT_MODE_SUPPORT_"), (String)supportHeatMode);
+  controlPage.replace(F("_QUIET_MODE_SUPPORT_"), (String)supportQuietMode);
+
+  String htmlControlPage = FPSTR(html_page_control);
   // write_log("Enter HVAC control");
-    // localize
-  controlPage.replace("_TXT_CTRL_CTEMP_", translatedWord(FL_(txt_ctrl_ctemp)));
-  controlPage.replace("_TXT_CTRL_TEMP_", translatedWord(FL_(txt_ctrl_temp)));
-  controlPage.replace("_TXT_CTRL_TITLE_", translatedWord(FL_(txt_ctrl_title)));
-  controlPage.replace("_TXT_CTRL_POWER_", translatedWord(FL_(txt_ctrl_power)));
-  controlPage.replace("_TXT_CTRL_MODE_", translatedWord(FL_(txt_ctrl_mode)));
-  controlPage.replace("_TXT_CTRL_FAN_", translatedWord(FL_(txt_ctrl_fan)));
-  controlPage.replace("_TXT_CTRL_VANE_", translatedWord(FL_(txt_ctrl_vane)));
-  controlPage.replace("_TXT_CTRL_WVANE_", translatedWord(FL_(txt_ctrl_wvane)));
-  controlPage.replace("_TXT_F_ON_", translatedWord(FL_(txt_f_on)));
-  controlPage.replace("_TXT_F_OFF_", translatedWord(FL_(txt_f_off)));
-  controlPage.replace("_TXT_F_AUTO_", translatedWord(FL_(txt_f_auto)));
-  controlPage.replace("_TXT_F_HEAT_", translatedWord(FL_(txt_f_heat)));
-  controlPage.replace("_TXT_F_DRY_", translatedWord(FL_(txt_f_dry)));
-  controlPage.replace("_TXT_F_COOL_", translatedWord(FL_(txt_f_cool)));
-  controlPage.replace("_TXT_F_FAN_", translatedWord(FL_(txt_f_fan)));
-  controlPage.replace("_TXT_F_QUIET_", translatedWord(FL_(txt_f_quiet)));
-  controlPage.replace("_TXT_F_LOW_", translatedWord(FL_(txt_f_low)));
-  controlPage.replace("_TXT_F_MEDIUM_", translatedWord(FL_(txt_f_medium)));
-  controlPage.replace("_TXT_F_MIDDLE_", translatedWord(FL_(txt_f_middle)));
-  controlPage.replace("_TXT_F_HIGH_", translatedWord(FL_(txt_f_high)));
-  controlPage.replace("_TXT_F_SWING_", translatedWord(FL_(txt_f_swing)));
-  controlPage.replace("_TXT_F_POS_", translatedWord(FL_(txt_f_pos)));
-  controlPage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+  // localize
+  htmlControlPage.replace(F("_TXT_CTRL_CTEMP_"), translatedWord(FL_(txt_ctrl_ctemp)));
+  htmlControlPage.replace(F("_TXT_CTRL_TEMP_"), translatedWord(FL_(txt_ctrl_temp)));
+  htmlControlPage.replace(F("_TXT_CTRL_TITLE_"), translatedWord(FL_(txt_ctrl_title)));
+  htmlControlPage.replace(F("_TXT_CTRL_POWER_"), translatedWord(FL_(txt_ctrl_power)));
+
+  htmlControlPage.replace(F("_TXT_F_ON_"), translatedWord(FL_(txt_f_on)));
+  htmlControlPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
   // set data
-  controlScript.replace(F("_MIN_TEMP_"), String(convertCelsiusToLocalUnit(min_temp, useFahrenheit)));
-  controlScript.replace(F("_MAX_TEMP_"), String(convertCelsiusToLocalUnit(max_temp, useFahrenheit)));
-  controlScript.replace(F("_TEMP_STEP_"), String(temp_step));
-  controlPage.replace("_ROOMTEMP_", String(convertCelsiusToLocalUnit(hp.getRoomTemperature(), useFahrenheit)));
-  controlPage.replace("_USE_FAHRENHEIT_", (String)useFahrenheit);
-  controlPage.replace("_TEMP_SCALE_", getTemperatureScale());
-  if (!supportHeatMode)
-  {
-    controlPage.replace(F("_HEAT_HIDDEN_"), F("'hidden' style='display: none;' disabled"));
-  }
-  else
-  {
-    controlPage.replace(F("_HEAT_HIDDEN_"), "");
-  }
-  controlScript.replace(F("_HEAT_MODE_SUPPORT_"), (String)supportHeatMode);
+  htmlControlPage.replace(F("_ROOMTEMP_"), String(convertCelsiusToLocalUnit(hp.getRoomTemperature(), useFahrenheit)));
+  htmlControlPage.replace(F("_TEMP_SCALE_"), getTemperatureScale());
+  htmlControlPage.replace(F("_TEMP_"), String(convertCelsiusToLocalUnit(hp.getTemperature(), useFahrenheit)));
 
   if (!(String(settings.power).isEmpty())) // null may crash with multitask
   {
-    controlPage.replace(F("_POWER_"), strcmp(settings.power, "ON") == 0 ? "checked" : "");
+    htmlControlPage.replace(F("_POWER_"), strcmp(settings.power, "ON") == 0 ? F("checked") : F(""));
   }
 
-  if (strcmp(settings.mode, "HEAT") == 0)
-  {
-    controlPage.replace("_MODE_H_", "selected");
-  }
-  else if (strcmp(settings.mode, "DRY") == 0)
-  {
-    controlPage.replace("_MODE_D_", "selected");
-  }
-  else if (strcmp(settings.mode, "COOL") == 0)
-  {
-    controlPage.replace("_MODE_C_", "selected");
-  }
-  else if (strcmp(settings.mode, "FAN") == 0)
-  {
-    controlPage.replace("_MODE_F_", "selected");
-  }
-  else if (strcmp(settings.mode, "AUTO") == 0)
-  {
-    controlPage.replace("_MODE_A_", "selected");
-  }
+  controlPage += htmlControlPage;
+  htmlControlPage = "";
 
-  if (strcmp(settings.fan, "AUTO") == 0)
-  {
-    controlPage.replace("_FAN_A_", "selected");
-  }
-  else if (strcmp(settings.fan, "QUIET") == 0)
-  {
-    controlPage.replace("_FAN_Q_", "selected");
-  }
-  else if (strcmp(settings.fan, "1") == 0)
-  {
-    controlPage.replace("_FAN_1_", "selected");
-  }
-  else if (strcmp(settings.fan, "2") == 0)
-  {
-    controlPage.replace("_FAN_2_", "selected");
-  }
-  else if (strcmp(settings.fan, "3") == 0)
-  {
-    controlPage.replace("_FAN_3_", "selected");
-  }
-  else if (strcmp(settings.fan, "4") == 0)
-  {
-    controlPage.replace("_FAN_4_", "selected");
-  }
+  controlPage += getModeSelect(String(settings.mode));
+  controlPage += getFanSelect(String(settings.fan));
+  controlPage += getVaneSelect(String(settings.vane));
+  controlPage += getWideVaneSelect(String(settings.wideVane));
+  
+  htmlControlPage = FPSTR(html_page_control_footer); 
+  htmlControlPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+  controlPage += htmlControlPage;
+  htmlControlPage = "";
 
-  controlPage.replace("_VANE_V_", settings.vane);
-  if (strcmp(settings.vane, "AUTO") == 0)
-  {
-    controlPage.replace("_VANE_A_", "selected");
-  }
-  else if (strcmp(settings.vane, "1") == 0)
-  {
-    controlPage.replace("_VANE_1_", "selected");
-  }
-  else if (strcmp(settings.vane, "2") == 0)
-  {
-    controlPage.replace("_VANE_2_", "selected");
-  }
-  else if (strcmp(settings.vane, "3") == 0)
-  {
-    controlPage.replace("_VANE_3_", "selected");
-  }
-  else if (strcmp(settings.vane, "4") == 0)
-  {
-    controlPage.replace("_VANE_4_", "selected");
-  }
-  else if (strcmp(settings.vane, "5") == 0)
-  {
-    controlPage.replace("_VANE_5_", "selected");
-  }
-  else if (strcmp(settings.vane, "SWING") == 0)
-  {
-    controlPage.replace("_VANE_S_", "selected");
-  }
-
-  controlPage.replace("_WIDEVANE_V_", settings.wideVane);
-  if (strcmp(settings.wideVane, "<<") == 0)
-  {
-    controlPage.replace("_WVANE_1_", "selected");
-  }
-  else if (strcmp(settings.wideVane, "<") == 0)
-  {
-    controlPage.replace("_WVANE_2_", "selected");
-  }
-  else if (strcmp(settings.wideVane, "|") == 0)
-  {
-    controlPage.replace("_WVANE_3_", "selected");
-  }
-  else if (strcmp(settings.wideVane, ">") == 0)
-  {
-    controlPage.replace("_WVANE_4_", "selected");
-  }
-  else if (strcmp(settings.wideVane, ">>") == 0)
-  {
-    controlPage.replace("_WVANE_5_", "selected");
-  }
-  else if (strcmp(settings.wideVane, "<>") == 0)
-  {
-    controlPage.replace("_WVANE_6_", "selected");
-  }
-  else if (strcmp(settings.wideVane, "SWING") == 0)
-  {
-    controlPage.replace("_WVANE_S_", "selected");
-  }
-  controlPage.replace("_TEMP_", String(convertCelsiusToLocalUnit(hp.getTemperature(), useFahrenheit)));
-
-  sendWrappedHTML(request, controlScript + controlPage);
-  controlPage = "";
+  sendWrappedHTML(request, controlPage);
   // We need to send the page content in chunks to overcome
   // a limitation on the maximum size we can send at one
   // time (approx 6k).
@@ -1758,17 +1772,17 @@ void handleMetrics(AsyncWebServerRequest *request)
   if (hppower == "0")
     hpmode = "0";
 
-  metrics.replace("_UNIT_NAME_", hostname);
-  metrics.replace("_VERSION_", m2mqtt_version);
-  metrics.replace("_POWER_", hppower);
-  metrics.replace("_ROOMTEMP_", (String)currentStatus.roomTemperature);
-  metrics.replace("_TEMP_", (String)currentSettings.temperature);
-  metrics.replace("_FAN_", hpfan);
-  metrics.replace("_VANE_", hpvane);
-  metrics.replace("_WIDEVANE_", hpwidevane);
-  metrics.replace("_MODE_", hpmode);
-  metrics.replace("_OPER_", (String)currentStatus.operating);
-  metrics.replace("_COMPFREQ_", (String)currentStatus.compressorFrequency);
+  metrics.replace(F("_UNIT_NAME_"), hostname);
+  metrics.replace(F("_VERSION_"), m2mqtt_version);
+  metrics.replace(F("_POWER_"), hppower);
+  metrics.replace(F("_ROOMTEMP_"), (String)currentStatus.roomTemperature);
+  metrics.replace(F("_TEMP_"), (String)currentSettings.temperature);
+  metrics.replace(F("_FAN_"), hpfan);
+  metrics.replace(F("_VANE_"), hpvane);
+  metrics.replace(F("_WIDEVANE_"), hpwidevane);
+  metrics.replace(F("_MODE_"), hpmode);
+  metrics.replace(F("_OPER_"), (String)currentStatus.operating);
+  metrics.replace(F("_COMPFREQ_"), (String)currentStatus.compressorFrequency);
   sendWrappedHTML(request, metrics);
 }
 #endif
@@ -1780,13 +1794,13 @@ void handleLogin(AsyncWebServerRequest *request)
   String msg;
   String loginPage = FPSTR(html_page_login);
   // localize
-  loginPage.replace("_TXT_LOGIN_TITLE_", translatedWord(FL_(txt_login_title)));
-  loginPage.replace("_TXT_LOGIN_PH_USER_", translatedWord(FL_(txt_login_ph_user)));
-  loginPage.replace("_TXT_LOGIN_PH_PWD_", translatedWord(FL_(txt_login_ph_pwd)));
-  loginPage.replace("_TXT_LOGIN_USERNAME_", translatedWord(FL_(txt_login_username)));
-  loginPage.replace("_TXT_LOGIN_PASSWORD_", translatedWord(FL_(txt_login_password)));
-  loginPage.replace("_TXT_LOGIN_OPEN_STATUS_", translatedWord(FL_(txt_login_open_status)));
-  loginPage.replace("_TXT_LOGIN_", translatedWord(FL_(txt_login)));
+  loginPage.replace(F("_TXT_LOGIN_TITLE_"), translatedWord(FL_(txt_login_title)));
+  loginPage.replace(F("_TXT_LOGIN_PH_USER_"), translatedWord(FL_(txt_login_ph_user)));
+  loginPage.replace(F("_TXT_LOGIN_PH_PWD_"), translatedWord(FL_(txt_login_ph_pwd)));
+  loginPage.replace(F("_TXT_LOGIN_USERNAME_"), translatedWord(FL_(txt_login_username)));
+  loginPage.replace(F("_TXT_LOGIN_PASSWORD_"), translatedWord(FL_(txt_login_password)));
+  loginPage.replace(F("_TXT_LOGIN_OPEN_STATUS_"), translatedWord(FL_(txt_login_open_status)));
+  loginPage.replace(F("_TXT_LOGIN_"), translatedWord(FL_(txt_login)));
   if (request->hasHeader("Cookie"))
   {
     // Found cookie;
@@ -1873,12 +1887,12 @@ void handleUpgrade(AsyncWebServerRequest *request)
   uploaderror = 0;
   String upgradePage = FPSTR(html_page_upgrade);
   // localize
-  upgradePage.replace("_TXT_FW_UPDATE_PAGE_", translatedWord(FL_(txt_fw_update_page)));
-  upgradePage.replace("_TXT_B_UPGRADE_", translatedWord(FL_(txt_upgrade)));
-  upgradePage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
-  upgradePage.replace("_TXT_UPGRADE_TITLE_", translatedWord(FL_(txt_upgrade_title)));
-  upgradePage.replace("_TXT_UPGRADE_INFO_", translatedWord(FL_(txt_upgrade_info)));
-  upgradePage.replace("_TXT_UPGRADE_START_", translatedWord(FL_(txt_upgrade_start)));
+  upgradePage.replace(F("_TXT_FW_UPDATE_PAGE_"), translatedWord(FL_(txt_fw_update_page)));
+  upgradePage.replace(F("_TXT_B_UPGRADE_"), translatedWord(FL_(txt_upgrade)));
+  upgradePage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
+  upgradePage.replace(F("_TXT_UPGRADE_TITLE_"), translatedWord(FL_(txt_upgrade_title)));
+  upgradePage.replace(F("_TXT_UPGRADE_INFO_"), translatedWord(FL_(txt_upgrade_info)));
+  upgradePage.replace(F("_TXT_UPGRADE_START_"), translatedWord(FL_(txt_upgrade_start)));
 
   sendWrappedHTML(request, upgradePage);
 }
@@ -1889,8 +1903,8 @@ void handleUploadDone(AsyncWebServerRequest *request)
   bool restartflag = false;
   String uploadDonePage = FPSTR(html_page_upload);
   // localize
-  uploadDonePage.replace("_TXT_UPLOAD_FW_PAGE_", translatedWord(FL_(txt_upload_fw_page)));
-  uploadDonePage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+  uploadDonePage.replace(F("_TXT_UPLOAD_FW_PAGE_"), translatedWord(FL_(txt_upload_fw_page)));
+  uploadDonePage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
 
   String content = F("<div style='text-align:center;'><b>");
   content += translatedWord(FL_(txt_upload));
@@ -1954,8 +1968,8 @@ void handleUploadDone(AsyncWebServerRequest *request)
     restartflag = true;
   }
   content += F("</div><br/>");
-  uploadDonePage.replace("_UPLOAD_MSG_", content);
-  uploadDonePage.replace("_TXT_BACK_", translatedWord(FL_(txt_back)));
+  uploadDonePage.replace(F("_UPLOAD_MSG_"), content);
+  uploadDonePage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
   if (restartflag)
   {
     String countDown = FPSTR(count_down_script);
@@ -2054,38 +2068,46 @@ void write_log(const String& log)
 heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings settings)
 {
   bool update = false;
-  if (request->hasArg("PWRCHK"))
+  if (request->args() == 0)
+    return settings;
+
+  if (request->hasArg(F("PWRCHK")))
   {
-    settings.power = request->hasArg("POWER") ? "ON" : "OFF";
+    settings.power = request->hasArg(F("POWER")) ? "ON" : "OFF";
     update = true;
   }
-  if (request->hasArg("MODE"))
+  if (request->hasArg(F("MODE")))
   {
-    ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
-    settings.mode = request->arg("MODE").c_str();
-    ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
+    //ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
+    settings.mode = request->arg(F("MODE")).c_str();
+    //ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
+    update = true;
+
+  }
+  if (request->hasArg(F("TEMP")))
+  {
+    float new_temp = convertLocalUnitToCelsius(request->arg(F("TEMP")).toFloat(), useFahrenheit);
+    if (new_temp != settings.temperature)
+    {
+      settings.temperature = new_temp;
+      update = true;
+    }
+  }
+  if (request->hasArg(F("FAN")))
+  {
+    //ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
+    settings.fan = request->arg(F("FAN")).c_str();
+    //ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
     update = true;
   }
-  if (request->hasArg("TEMP"))
+  if (request->hasArg(F("VANE")))
   {
-    settings.temperature = convertLocalUnitToCelsius(request->arg("TEMP").toFloat(), useFahrenheit);
+    settings.vane = request->arg(F("VANE")).c_str();
     update = true;
   }
-  if (request->hasArg("FAN"))
+  if (request->hasArg(F("WIDEVANE")))
   {
-    ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
-    settings.fan = request->arg("FAN").c_str();
-    ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
-    update = true;
-  }
-  if (request->hasArg("VANE"))
-  {
-    settings.vane = request->arg("VANE").c_str();
-    update = true;
-  }
-  if (request->hasArg("WIDEVANE"))
-  {
-    settings.wideVane = request->arg("WIDEVANE").c_str();
+    settings.wideVane = request->arg(F("WIDEVANE")).c_str();
     update = true;
   }
   if (update)
@@ -2105,95 +2127,72 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
   return settings;
 }
 
-void readHeatPumpSettings()
-{
-  heatpumpSettings currentSettings = hp.getSettings();
-
-  rootInfo.clear();
-  rootInfo["temperature"] = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-  rootInfo["fan"] = getFanModeFromHp(currentSettings.fan);
-  rootInfo["vane"] = currentSettings.vane;
-  rootInfo["wideVane"] = currentSettings.wideVane;
-  rootInfo["mode"] = hpGetMode(currentSettings);
-}
-
 void hpSettingsChanged()
 {
   if (millis() - hp.getLastWanted() < PREVENT_UPDATE_INTERVAL_MS) // prevent HA setting change after send update interval we wait for 1 seconds before udpate data
   {
     return;
   }
-  // send room temp, operating info and all information
-  readHeatPumpSettings();
 
-  if (mqttClient != nullptr && mqttClient->connected())
-  {
-    String mqttOutput;
-    serializeJson(rootInfo, mqttOutput);
-    if (!mqttClient->publish(ha_settings_topic.c_str(), 1, false, mqttOutput.c_str()))
-    {
-      if (_debugModeLogs)
-        mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, (char *)("Failed to publish hp settings"));
-    }
-  }
+  // send room temp, operating info and all information
   hpStatusChanged(hp.getStatus());
 }
 
 // Convert mode for home assistant
 String getFanModeFromHp(String modeFromHp)
 {
-  if (modeFromHp == "QUIET")
+  if (modeFromHp == F("QUIET"))
   {
-    return "diffuse";
+    return F("diffuse");
   }
-  else if (modeFromHp == "1")
+  else if (modeFromHp == F("1"))
   {
-    return "low";
+    return F("low");
   }
-  else if (modeFromHp == "2")
+  else if (modeFromHp == F("2"))
   {
-    return "medium";
+    return F("medium");
   }
-  else if (modeFromHp == "3")
+  else if (modeFromHp == F("3"))
   {
-    return "middle";
+    return F("middle");
   }
-  else if (modeFromHp == "4")
+  else if (modeFromHp == F("4"))
   {
-    return "high";
+    return F("high");
   }
   else
   { // case "AUTO" or default:
-    return "auto";
+    return F("auto");
   }
 }
 
 // Convert mode for heatpump lib
 String getFanModeFromHa(String modeFromHa)
 {
-  if (modeFromHa == "diffuse")
+  if (modeFromHa == F("diffuse"))
   {
-    return "QUIET";
+    return F("QUIET");
   }
-  else if (modeFromHa == "low")
+  else if (modeFromHa == F("low"))
   {
-    return "1";
+    return F("1");
   }
-  else if (modeFromHa == "medium")
+  else if (modeFromHa == F("medium"))
   {
-    return "2";
+    return F("2");
   }
-  else if (modeFromHa == "middle")
+  else if (modeFromHa == F("middle"))
   {
-    return "3";
+    return F("3");
   }
-  else if (modeFromHa == "high")
+  else if (modeFromHa == F("high"))
   {
-    return "4";
+    return F("4");
   }
   else
   { // case "AUTO" or default:
-    return "AUTO";
+    return F("AUTO");
   }
 }
 
@@ -2205,16 +2204,16 @@ String hpGetMode(heatpumpSettings hpSettings)
   String hppower = String(hpSettings.power);
   if (hppower.equalsIgnoreCase("off"))
   {
-    return "off";
+    return F("off");
   }
 
   String hpmode = String(hpSettings.mode);
   hpmode.toLowerCase();
 
   if (hpmode == "fan")
-    return "fan_only";
+    return F("fan_only");
   else if (hpmode == "auto")
-    return "heat_cool";
+    return F("heat_cool");
   else
     return hpmode; // cool, heat, dry
 }
@@ -2227,16 +2226,16 @@ String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings)
   String hppower = String(hpSettings.power);
   if (hppower.equalsIgnoreCase("off"))
   {
-    return "off";
+    return F("off");
   }
 
   String hpmode = String(hpSettings.mode);
   hpmode.toLowerCase();
 
   if (hpmode == "fan")
-    return "fan";
+    return F("fan");
   else if (!hpStatus.operating)
-    return "idle";
+    return F("idle");
   else if (hpmode == "auto")
   {
     // If the "operating" flag is true and the heat pump is in "auto" mode,
@@ -2244,18 +2243,18 @@ String hpGetAction(heatpumpStatus hpStatus, heatpumpSettings hpSettings)
     // indicate which of those two states it's in. We can infer the state by
     // comparing the room temperature to the set point temperature.
     if (hpStatus.roomTemperature > hpSettings.temperature) // above set point
-      return "cooling";
+      return F("cooling");
     else if (hpStatus.roomTemperature < hpSettings.temperature) // below set point
-      return "heating";
+      return F("heating");
     else
       return hpmode; // unknown
   }
   else if (hpmode == "cool")
-    return "cooling";
+    return F("cooling");
   else if (hpmode == "heat")
-    return "heating";
+    return F("heating");
   else if (hpmode == "dry")
-    return "drying";
+    return F("drying");
   else
     return hpmode; // unknown
 }
@@ -2277,9 +2276,8 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   rootInfo.clear();
   float roomTemperature = convertCelsiusToLocalUnit(currentStatus.roomTemperature, useFahrenheit);
   float temperature = convertCelsiusToLocalUnit(currentSettings.temperature, useFahrenheit);
-  rootInfo["roomTemperature"] = roomTemperature;
+  rootInfo[getEntityTag(ENT_ROOM_TEMPERATURE)] = roomTemperature;
   rootInfo["temperature"] = temperature;
-  rootInfo["compressorFreq"] = currentStatus.compressorFrequency;
   events.send(String(roomTemperature).c_str(), "room_temperature", millis(), 50); // send data to browser
   events.send(String(temperature).c_str(), "temperature", millis(), 60);
   if (!(String(currentSettings.fan).isEmpty())) // null may crash with multitask
@@ -2301,7 +2299,7 @@ void hpStatusChanged(heatpumpStatus currentStatus)
   rootInfo["action"] = hpGetAction(currentStatus, currentSettings);
   events.send(currentSettings.mode, "mode", millis(), 100);
   events.send(currentSettings.power, "power", millis(), 110);
-  rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
+  rootInfo[getEntityTag(ENT_COMPR_FRQ)] = currentStatus.compressorFrequency;
   if (mqttClient != nullptr && mqttClient->connected())
   {
     String mqttOutput;
@@ -2325,9 +2323,9 @@ void hpCheckRemoteTemp()
   }
 }
 
-void sendKeepAlive()
+void sendKeepAlive(bool force = false)
 {
-  if (millis() - lastAliveMsgSend < SEND_ALIVE_MSG_INTERVAL_MS)
+  if ((millis() - lastAliveMsgSend < SEND_ALIVE_MSG_INTERVAL_MS) && !force)
   {
     return;
   }
@@ -2387,7 +2385,8 @@ void hpSendLocalState()
   {
     String mqttOutput;
     serializeJson(rootInfo, mqttOutput);
-    mqttClient->publish(ha_debug_pckts_topic.c_str(), 1, false, mqttOutput.c_str());
+    if (_debugModePckts)
+      mqttClient->publish(ha_debug_pckts_topic.c_str(), 1, false, mqttOutput.c_str());
     if (!mqttClient->publish(ha_state_topic.c_str(), 1, false, mqttOutput.c_str()))
     {
       if (_debugModeLogs)
@@ -2423,8 +2422,8 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
     modeUpper.toUpperCase();
     if (modeUpper == "OFF")
     {
-      rootInfo["mode"] = "off";
-      rootInfo["action"] = "off";
+      rootInfo["mode"] = F("off");
+      rootInfo["action"] = F("off");
       hpSendLocalState();
       hp.setPowerSetting("OFF");
       update = true;
@@ -2433,30 +2432,30 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
     {
       if (modeUpper == "HEAT_COOL")
       {
-        rootInfo["mode"] = "heat_cool";
-        rootInfo["action"] = "idle";
-        modeUpper = "AUTO";
+        rootInfo["mode"] = F("heat_cool");
+        rootInfo["action"] = F("idle");
+        modeUpper = F("AUTO");
       }
       else if (modeUpper == "HEAT")
       {
-        rootInfo["mode"] = "heat";
-        rootInfo["action"] = "heating";
+        rootInfo["mode"] = F("heat");
+        rootInfo["action"] = F("heating");
       }
       else if (modeUpper == "COOL")
       {
-        rootInfo["mode"] = "cool";
-        rootInfo["action"] = "cooling";
+        rootInfo["mode"] = F("cool");
+        rootInfo["action"] = F("cooling");
       }
       else if (modeUpper == "DRY")
       {
-        rootInfo["mode"] = "dry";
-        rootInfo["action"] = "drying";
+        rootInfo["mode"] = F("dry");
+        rootInfo["action"] = F("drying");
       }
       else if (modeUpper == "FAN_ONLY")
       {
-        rootInfo["mode"] = "fan_only";
-        rootInfo["action"] = "fan";
-        modeUpper = "FAN";
+        rootInfo["mode"] = F("fan_only");
+        rootInfo["action"] = F("fan");
+        modeUpper = F("FAN");
       }
       else
       {
@@ -2574,6 +2573,11 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
       factoryReset();
     }
   }
+  else if (strcmp(topic, ha_birth_topic.c_str()) == 0)
+  { // We receive birth topic from ha
+    if (strcmp(message, mqtt_payload_available) == 0)
+      sendKeepAlive(true);
+  }
   else if (strcmp(topic, ha_custom_packet.c_str()) == 0)
   { // send custom packet for advance user
     String custom = message;
@@ -2600,6 +2604,46 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
 
     hp.sendCustomPacket(bytes, byteCount);
   }
+  else if (strcmp(topic, ha_system_setting_request.c_str()) == 0) // We receive command for board
+  {
+      // Allocate document capacity.
+      const size_t capacity = JSON_OBJECT_SIZE(3) + 121;
+      DynamicJsonDocument doc(capacity);
+      // Deserialize the JSON document
+      DeserializationError error = deserializeJson(doc, message);
+      // Test if parsing succeeds.
+      if (!error) {
+          if (doc.containsKey("options")) {
+              JsonObject options = doc["options"];
+              if (options.containsKey("webpanel")) {
+                  String webPanel = doc["options"]["webpanel"];
+                  ESP_LOGI(TAG, "Web panel option: %s", webPanel.c_str());
+                  if (webPanel == "On" || webPanel == "Off") {
+                      bool new_web_panel_disable = false;
+                      if (webPanel == "On") {
+                          new_web_panel_disable = false;
+                      }
+                      if (webPanel == "Off") {
+                          new_web_panel_disable = true;
+                      }
+                      if (_webPanelDisable != new_web_panel_disable) {
+                          ESP_LOGI(TAG, "Set Webpanel option and reboot");
+                          _webPanelDisable = new_web_panel_disable;
+                          saveCurrentOthers();
+                          sendRebootRequest(5);
+                          mqttClient->publish(ha_system_setting_respond.c_str(), 1, false, message);
+                      } else {
+                          ESP_LOGE(TAG, "Set Web panel option do nothing");
+                      }
+                  } else {
+                      ESP_LOGE(TAG, "Web panel Invalid option");
+                  }
+              }
+          }
+      } else {
+          ESP_LOGE(TAG, "Error decode json data");
+      }
+  }
   else
   {
     String msg("heatpump: wrong mqtt topic: ");
@@ -2621,299 +2665,377 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
   delete[] message;
 }
 
-void haConfigTemp(String tag, String icon) {
-  // send HA config packet for tempearature sensor
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
-  DynamicJsonDocument haConfig(capacity);
+// Lookup tables for Tag lookup
+static const char* const entityTagLUT[MAX_ENTITY_ID + 1] = {
+    /* 0 */ "room_temperature",
+    /* 1 */ "connection_state",
+    /* 2 */ "up_time",
+    /* 3 */ "free_heap",
+    /* 4 */ "rssi",
+    /* 5 */ "bssi",
+    /* 6 */ "compressor_freq",
+    /* 7 */ "restart",
+    /* 8 */ "webpanel"};
 
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  haConfig["unique_id"] = String("hvac_") + getId() + "_" + tag;
+// Lookup tables for Name lookup
+static const char* const entityNameLUT[MAX_ENTITY_ID + 1] = {
+    /* 0 */ "Room Temperature",
+    /* 1 */ "Connection state",
+    /* 2 */ "Up Time",
+    /* 3 */ "Free Heap",
+    /* 4 */ "RSSI",
+    /* 5 */ "BSSI",
+    /* 6 */ "Compressor Freq",
+    /* 7 */ "Restart",
+    /* 8 */ "WebPanel"};
 
-  haConfig["dev_cla"] = "temperature";
-  haConfig["stat_t"] = ha_state_topic;
-  haConfig["unit_of_meas"] = useFahrenheit ? "°F" : "°C";
-  haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
-
-  String mqttOutput;
-  serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
+//Fast lookup functions for Tag
+const char* getEntityTag(byte tag_id) {
+    if (tag_id <= MAX_ENTITY_ID) {
+        return entityTagLUT[tag_id];
+    }
+    return "unknown";
 }
 
-void haConfigFreq(String tag, String unit, String icon) {
-  // send HA config packet for freq sensor
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
-  DynamicJsonDocument haConfig(capacity);
-
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  haConfig["unique_id"] = getId() + "_" + tag;
-
-  haConfig["dev_cla"] = "frequency";
-  haConfig["stat_t"] = ha_state_topic;
-  haConfig["unit_of_meas"] = unit;
-  haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
-
-  String mqttOutput;
-  serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
+//Fast lookup functions for Name
+const char* getEntityName(byte tag_id) {
+    if (tag_id <= MAX_ENTITY_ID) {
+        return entityNameLUT[tag_id];
+    }
+    return "Unknown";
 }
 
-void haConfigSensor(String tag, String unit, String icon)
+String haGetConfigTopic(String entity_type, String entity_tag = "")
+{
+  String ha_topic;
+
+  ha_topic = (others_haa ? others_haa_topic : "homeassistant")  + "/" + entity_type + "/";
+  if (mqtt_fn.isEmpty()) {
+      mqtt_fn = getId();
+  }
+  ha_topic += mqtt_fn + "/";
+  if (!entity_tag.isEmpty()) {
+      ha_topic += entity_tag + "/";
+  }
+  ha_topic += "config";
+  return ha_topic;
+}
+
+void haConfigureDevice(DynamicJsonDocument &haConfig)
+{
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 50;
+  DynamicJsonDocument haConnInfo(capacity);  
+
+  String dev_id = getId();
+
+  // device info object
+  JsonObject haConfigDevice = haConfig.createNestedObject(F("dev"));
+  
+  // identifiers array
+  haConfigDevice.createNestedArray(F("ids"))[0] = mqtt_fn + "_" + dev_id;
+
+  // connection info (mac)
+  haConnInfo.createNestedArray();
+  haConnInfo[0] = F("mac");
+  haConnInfo[1] = dev_id;
+  haConfigDevice.createNestedArray("cns")[0] = haConnInfo;
+
+  // other device infos
+  haConfigDevice[F("name")] = mqtt_fn;
+  haConfigDevice[F("sw")] = String(appName) + " " + String(getAppVersion());
+  haConfigDevice[F("hw")] = String(ARDUINO_BOARD);  
+  haConfigDevice[F("mdl")] = model;
+  haConfigDevice[F("mf")] = manufacturer;
+  haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
+
+  // availability topic
+  haConfig[F("avty_t")] = ha_availability_topic;
+  haConfig[F("pl_avail")] = mqtt_payload_available;       // MQTT online message payload
+  haConfig[F("pl_not_avail")] = mqtt_payload_unavailable; // MQTT offline message payload
+}
+
+void haConfigSensor(byte tag_id, String unit, String icon, bool is_diagnostic = false)
 {
   // send HA config packet for up time
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
   DynamicJsonDocument haConfig(capacity);
 
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  // clean string
-  tag.replace(" ", "_");
-  tag.toLowerCase();
-  //
-  haConfig["unique_id"] = getId() + "_" + tag;
-  if (strcmp(tag.c_str(), "connection_state") == 0)
+  haConfig[F("icon")] = icon;
+  haConfig[F("name")] = getEntityName(tag_id);
+  
+  // Set unique ID and value template
+  String tag = getEntityTag(tag_id);
+  haConfig[F("unique_id")] = getId() + "_" + tag;
+  haConfig[F("val_tpl")] = "{{ value_json." + tag + " }}";
+
+  if (tag_id == ENT_ROOM_TEMPERATURE)
   {
-    haConfig["dev_cla"] = "connectivity";
-    haConfig["entity_category"] = "diagnostic";
-    haConfig["payload_on"] = "online";
-    haConfig["payload_off"] = "offline";
-    haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["val_tpl"] = "{{ value_json.connection_state }}";
+    haConfig[F("dev_cla")] = "temperature";
+    haConfig[F("unit_of_meas")] = useFahrenheit ? F("°F") : F("°C");
+    haConfig[F("stat_t")] = ha_state_topic;
   }
-  else if (strcmp(tag.c_str(), "up_time") == 0)
+  else if (tag_id == ENT_COMPR_FRQ)
   {
-    // haConfig["dev_cla"] = "timestamp";
-    haConfig["stat_t"] = ha_system_setting_info;
-    // haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
-    haConfig["entity_category"] = "diagnostic";
+    haConfig[F("dev_cla")] = "frequency";
+    haConfig[F("unit_of_meas")] = unit;
+    haConfig[F("stat_t")] = ha_state_topic;
   }
-  else if (strcmp(tag.c_str(), "free_heap") == 0)
+  else if (tag_id == ENT_CONNECTION_STATE)
   {
-    haConfig["entity_category"] = "diagnostic";
-    haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
+    haConfig[F("dev_cla")] = "connectivity";
+    haConfig[F("payload_on")] = "online";
+    haConfig[F("payload_off")] = "offline";
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
-  else if (strcmp(tag.c_str(), "rssi") == 0)
+  else if (tag_id == ENT_UP_TIME)
   {
-    haConfig["entity_category"] = "diagnostic";
-    haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["unit_of_meas"] = unit;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
+    haConfig[F("dev_cla")] = "timestamp";
+    haConfig[F("val_tpl")] = "{{ as_datetime(value_json." + tag + ") }}";
+    // haConfig[F("unit_of_meas")] = unit;
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
-  else if (strcmp(tag.c_str(), "bssi") == 0)
+  else if (tag_id == ENT_FREE_HEAP)
   {
-    haConfig["entity_category"] = "diagnostic";
-    haConfig["stat_t"] = ha_system_setting_info;
-    haConfig["val_tpl"] = "{{value_json." + tag + "}}";
+    haConfig[F("unit_of_meas")] = unit;
+    haConfig[F("sug_dsp_prc")] = 0;
+    haConfig[F("stat_t")] = ha_system_info_topic;
+  }
+  else if (tag_id == ENT_RSSI)
+  {
+    haConfig[F("unit_of_meas")] = unit;
+    haConfig[F("stat_t")] = ha_system_info_topic;
+  }
+  else if (tag_id == ENT_BSSI)
+  {
+    haConfig[F("stat_t")] = ha_system_info_topic;
   }
 
-  JsonObject haConfigDevice = haConfig["device"].to<JsonObject>();
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = getAppVersion();
-  // haConfigDevice["sn"] = getId();
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
+  if (is_diagnostic)
+    haConfig[F("ent_cat")] = F("diagnostic");
 
+  // add device info
+  haConfigureDevice(haConfig);
+  
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_sensor;
-  if (strcmp(tag.c_str(), "connection_state") == 0)
+
+  String ha_entity_type;
+  if (tag_id == ENT_CONNECTION_STATE)
   {
-    ha_config_topic_sensor = "homeassistant/binary_sensor/hvac_" + getId() + "_" + tag + "/config";
+    ha_entity_type = F("binary_sensor");
   }
   else
   {
-    ha_config_topic_sensor = "homeassistant/sensor/hvac_" + getId() + "_" + tag + "/config";
+    ha_entity_type = F("sensor");
   }
-  mqttClient->publish(ha_config_topic_sensor.c_str(), 1, true, mqttOutput.c_str());
+
+  String ha_config_topic = haGetConfigTopic(ha_entity_type, tag);
+  mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
-void haConfigButton(String tag, String payload_press, String icon)
+void haConfigButton(byte tag_id, String payload_press, String icon)
 {
   // send HA config packet for button
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
   DynamicJsonDocument haConfig(capacity);
 
-  haConfig["icon"] = icon;
-  haConfig["name"] = tag;
-  // clean string
-  tag.replace(" ", "_");
-  tag.toLowerCase();
-  //
-  haConfig["unique_id"] = getId() + "_" + tag;
-  if (strcmp(payload_press.c_str(), "restart") == 0)
-  {
-    haConfig["dev_cla"] = "restart";
-  }
-  haConfig["command_topic"] = ha_system_set_topic;
-  haConfig["entity_category"] = "diagnostic";
-  haConfig["payload_press"] = payload_press; //"restart", "factory", "upgrade" ;
+  haConfig[F("icon")] = icon;
+  haConfig[F("name")] = getEntityName(tag_id);
+  
+  // Set unique ID and value template
+  String tag = getEntityTag(tag_id);
+  haConfig[F("unique_id")] = getId() + "_" + tag;
 
-  JsonObject haConfigDevice = haConfig["device"].to<JsonObject>();
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-
-  haConfigDevice["cu"] = "http://" + WiFi.localIP().toString();
+  haConfig[F("dev_cla")] = payload_press;
+  haConfig[F("payload_press")] = payload_press; //"restart", "factory", "upgrade" ;
+  haConfig[F("command_topic")] = ha_system_set_topic;
+  haConfig[F("ent_cat")] = F("config");
+  
+  // add device info
+  haConfigureDevice(haConfig);
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
-  String ha_config_topic_button = "homeassistant/button/" + getId() + "/" + tag + "/config";
-  mqttClient->publish(ha_config_topic_button.c_str(), 1, true, mqttOutput.c_str());
+  String ha_config_topic = haGetConfigTopic("button", tag);
+  mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
+}
+
+void haConfigOption(uint8_t tag_id, String icon) {
+    const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 250;
+    DynamicJsonDocument haConfig(capacity);
+
+    haConfig[F("icon")] = icon;
+    haConfig[F("name")] = getEntityName(tag_id);
+    // Set unique ID and value template
+    String tag = getEntityTag(tag_id);
+    haConfig[F("unique_id")] = getId() + "_" + tag;
+    haConfig[F("command_template")] = "{\"options\": {\"" + tag + "\": \"{{ value }}\" } }";
+    haConfig[F("command_topic")] = ha_system_setting_request;
+
+    JsonArray haConfigOptions = haConfig[F("options")].to<JsonArray>();
+    if (tag_id == ENT_WEB_PANEL) {
+        haConfigOptions.add("On");
+        haConfigOptions.add("Off");
+    }
+    haConfig[F("state_topic")] = ha_system_setting_info;
+    haConfig[F("value_template")] = "{{ value_json." + tag + " }}";
+    haConfig[F("entity_category")] = F("config");
+
+    haConfigureDevice(haConfig);
+
+    String mqttOutput;
+    serializeJson(haConfig, mqttOutput);
+    String ha_config_topic = haGetConfigTopic("select", tag);
+    mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
 }
 
 void sendDeviceInfo()
 {
   // send HA config packet for device info
-  const size_t capacity = JSON_ARRAY_SIZE(15) + JSON_OBJECT_SIZE(30) + 150;
+  uint32_t freeHeapBytes = getFreeHeapBytes();
+  uint32_t totalHeapBytes = getTotalHeapBytes();
+
+  const size_t capacity = JSON_OBJECT_SIZE(10);
   DynamicJsonDocument haConfigInfo(capacity);
 
-  haConfigInfo["connection_state"] = hp.isConnected() ? "online" : "offline";
+  haConfigInfo[getEntityTag(ENT_CONNECTION_STATE)] = hp.isConnected() ? "online" : "offline";
   // get free heap in percent
-#ifdef ESP32
-  uint32_t freeHeapBytes = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-  uint32_t totalHeapBytes = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
-#else
-  uint32_t freeHeapBytes = ESP.getFreeHeap();
-  uint32_t totalHeapBytes = 64000;
-#endif
-  float percentageHeapFree = freeHeapBytes * 100.0f / (float)totalHeapBytes;
+  // we round to 0.5 (half) to avoid continue changes
+  //float percentageHeapFree = 0.5 * round(2.0*(freeHeapBytes * 100.0f / (float)totalHeapBytes));
+  // we round to avoid continue changes
+  float percentageHeapFree = round(freeHeapBytes * 100.0f / (float)totalHeapBytes);
   String heap(percentageHeapFree);
-  haConfigInfo["free_heap"] = heap;
+  haConfigInfo[getEntityTag(ENT_FREE_HEAP)] = heap;
   // get wifi rssi
-  haConfigInfo["rssi"] = String(WiFi.RSSI());
-  haConfigInfo["bssi"] = getWifiBSSID();
-  haConfigInfo["up_time"] = getUpTime();
+  haConfigInfo[getEntityTag(ENT_RSSI)] = String(WiFi.RSSI());
+  haConfigInfo[getEntityTag(ENT_BSSI)] = getWifiBSSID();
+  haConfigInfo[getEntityTag(ENT_UP_TIME)] = getUpTimeSeconds();
+  haConfigInfo[getEntityTag(ENT_WEB_PANEL)] = _webPanelDisable ? "Off" : "On";
+
   String mqttOutput;
   serializeJson(haConfigInfo, mqttOutput);
-  mqttClient->publish(ha_system_setting_info.c_str(), 1, false, mqttOutput.c_str());
+  mqttClient->publish(ha_system_info_topic.c_str(), 1, false, mqttOutput.c_str());
 }
 
-void sendHaConfig()
+void haConfigClimate()
 {
-
   // send HA config packet
   // setup HA payload device
-  const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2048;
+  const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + 2 * JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2500;
   DynamicJsonDocument haConfig(capacity);
 
-  haConfig["name"] = nullptr;
-  haConfig["unique_id"] = getId();
+  haConfig[F("name")] = nullptr;
+  haConfig[F("unique_id")] = getId();
 
-  JsonArray haConfigModes = haConfig.createNestedArray("modes");
-  haConfigModes.add("heat_cool"); // native AUTO mode
-  haConfigModes.add("cool");
-  haConfigModes.add("dry");
+  JsonArray haConfigModes = haConfig.createNestedArray(F("modes"));
+  haConfigModes.add(F("heat_cool")); // native AUTO mode
+  haConfigModes.add(F("cool"));
+  haConfigModes.add(F("dry"));
   if (supportHeatMode)
   {
-    haConfigModes.add("heat");
+    haConfigModes.add(F("heat"));
   }
-  haConfigModes.add("fan_only"); // native FAN mode
-  haConfigModes.add("off");
+  haConfigModes.add(F("fan_only")); // native FAN mode
+  haConfigModes.add(F("off"));
 
-  haConfig["mode_cmd_t"] = ha_mode_set_topic;
-  haConfig["mode_stat_t"] = ha_state_topic;
-  haConfig["mode_stat_tpl"] = F("{{ value_json.mode if (value_json is defined and value_json.mode is defined and value_json.mode|length) else 'off' }}"); // Set default value for fix "Could not parse data for HA"
-  haConfig["temp_cmd_t"] = ha_temp_set_topic;
-  haConfig["temp_stat_t"] = ha_state_topic;
-  haConfig["pow_cmd_t"] = ha_power_set_topic;
-  haConfig["avty_t"] = ha_availability_topic;          // MQTT last will (status) messages topic
-  haConfig["pl_not_avail"] = mqtt_payload_unavailable; // MQTT offline message payload
-  haConfig["pl_avail"] = mqtt_payload_available;       // MQTT online message payload
+  haConfig[F("mode_cmd_t")] = ha_mode_set_topic;
+  haConfig[F("mode_stat_t")] = ha_state_topic;
+  haConfig[F("mode_stat_tpl")] = F("{{ value_json.mode if (value_json is defined and value_json.mode is defined and value_json.mode|length) else 'off' }}"); // Set default value for fix "Could not parse data for HA"
+  haConfig[F("temp_cmd_t")] = ha_temp_set_topic;
+  haConfig[F("temp_stat_t")] = ha_state_topic;
+  haConfig[F("pow_cmd_t")] = ha_power_set_topic;
+
   // Set default value for fix "Could not parse data for HA"
   String temp_stat_tpl_str = F("{% if (value_json is defined and value_json.temperature is defined) %}{% if (value_json.temperature|int >= ");
   temp_stat_tpl_str += (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + " and value_json.temperature|int <= ";
   temp_stat_tpl_str += (String)convertCelsiusToLocalUnit(max_temp, useFahrenheit) + ") %}{{ value_json.temperature }}";
   temp_stat_tpl_str += "{% elif (value_json.temperature|int < " + (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + ") %}" + (String)convertCelsiusToLocalUnit(min_temp, useFahrenheit) + "{% elif (value_json.temperature|int > " + (String)convertCelsiusToLocalUnit(max_temp, useFahrenheit) + ") %}" + (String)convertCelsiusToLocalUnit(max_temp, useFahrenheit) + "{% endif %}{% else %}" + (String)convertCelsiusToLocalUnit(22, useFahrenheit) + "{% endif %}";
-  haConfig["temp_stat_tpl"] = temp_stat_tpl_str;
-  haConfig["curr_temp_t"] = ha_state_topic;
-  String curr_temp_tpl_str = F("{{ value_json.roomTemperature if (value_json is defined and value_json.roomTemperature is defined and value_json.roomTemperature|int > ");
+  haConfig[F("temp_stat_tpl")] = temp_stat_tpl_str;
+  haConfig[F("curr_temp_t")] = ha_state_topic;
+  String curr_temp_tpl_str = F("{{ value_json.room_temperature if (value_json is defined and value_json.room_temperature is defined and value_json.room_temperature|int > ");
   curr_temp_tpl_str += (String)convertCelsiusToLocalUnit(1, useFahrenheit) + ") }}"; // Set default value for fix "Could not parse data for HA"
-  haConfig["curr_temp_tpl"] = curr_temp_tpl_str;
-  haConfig["min_temp"] = convertCelsiusToLocalUnit(min_temp, useFahrenheit);
-  haConfig["max_temp"] = convertCelsiusToLocalUnit(max_temp, useFahrenheit);
-  haConfig["temp_step"] = temp_step;
-  haConfig["temperature_unit"] = useFahrenheit ? "F" : "C";
+  haConfig[F("curr_temp_tpl")] = curr_temp_tpl_str;
+  haConfig[F("min_temp")] = convertCelsiusToLocalUnit(min_temp, useFahrenheit);
+  haConfig[F("max_temp")] = convertCelsiusToLocalUnit(max_temp, useFahrenheit);
+  haConfig[F("temp_step")] = temp_step;
+  haConfig[F("temperature_unit")] = useFahrenheit ? F("F") : F("C");
 
-  JsonArray haConfigFan_modes = haConfig.createNestedArray("fan_modes");
-  haConfigFan_modes.add("auto");  //AUTO
-  haConfigFan_modes.add("diffuse"); //QUIET
-  haConfigFan_modes.add("low"); //1 native
-  haConfigFan_modes.add("medium"); //2 native
-  haConfigFan_modes.add("middle"); //3 native
-  haConfigFan_modes.add("high"); //4 native
+  // fan control
+  JsonArray haConfigFan_modes = haConfig.createNestedArray(F("fan_modes"));
+  haConfigFan_modes.add(F("auto"));  //AUTO
+  if (supportQuietMode)
+  {
+    haConfigFan_modes.add(F("diffuse")); //QUIET
+  }
+  haConfigFan_modes.add(F("low")); //1 native
+  haConfigFan_modes.add(F("medium")); //2 native
+  haConfigFan_modes.add(F("middle")); //3 native
+  haConfigFan_modes.add(F("high")); //4 native
 
+  haConfig[F("fan_mode_cmd_t")] = ha_fan_set_topic;
+  haConfig[F("fan_mode_stat_t")] = ha_state_topic;
+  haConfig[F("fan_mode_stat_tpl")] = F("{{ value_json.fan if (value_json is defined and value_json.fan is defined and value_json.fan|length) else 'auto' }}"); // Set default value for fix "Could not parse data for HA"
 
-  haConfig["fan_mode_cmd_t"] = ha_fan_set_topic;
-  haConfig["fan_mode_stat_t"] = ha_state_topic;
-  haConfig["fan_mode_stat_tpl"] = F("{{ value_json.fan if (value_json is defined and value_json.fan is defined and value_json.fan|length) else 'auto' }}"); // Set default value for fix "Could not parse data for HA"
+  // vertical swing mode control
+  JsonArray haConfigSwing_modes = haConfig.createNestedArray(F("swing_modes"));
+  haConfigSwing_modes.add(F("AUTO"));
+  haConfigSwing_modes.add(F("1"));
+  haConfigSwing_modes.add(F("2"));
+  haConfigSwing_modes.add(F("3"));
+  haConfigSwing_modes.add(F("4"));
+  haConfigSwing_modes.add(F("5"));
+  haConfigSwing_modes.add(F("SWING"));
 
-  JsonArray haConfigSwing_modes = haConfig.createNestedArray("swing_modes");
-  haConfigSwing_modes.add("AUTO");
-  haConfigSwing_modes.add("1");
-  haConfigSwing_modes.add("2");
-  haConfigSwing_modes.add("3");
-  haConfigSwing_modes.add("4");
-  haConfigSwing_modes.add("5");
-  haConfigSwing_modes.add("SWING");
+  haConfig[F("swing_mode_cmd_t")] = ha_vane_set_topic;
+  haConfig[F("swing_mode_stat_t")] = ha_state_topic;
+  haConfig[F("swing_mode_stat_tpl")] = F("{{ value_json.vane if (value_json is defined and value_json.vane is defined and value_json.vane|length) else 'AUTO' }}"); // Set default value for fix "Could not parse data for HA"
 
-  haConfig["swing_mode_cmd_t"] = ha_vane_set_topic;
-  haConfig["swing_mode_stat_t"] = ha_state_topic;
-  haConfig["swing_mode_stat_tpl"] = F("{{ value_json.vane if (value_json is defined and value_json.vane is defined and value_json.vane|length) else 'AUTO' }}"); // Set default value for fix "Could not parse data for HA"
-  haConfig["action_topic"] = ha_state_topic;
-  haConfig["action_template"] = F("{{ value_json.action if (value_json is defined and value_json.action is defined and value_json.action|length) else 'idle' }}"); // Set default value for fix "Could not parse data for HA"
+  // horizontal swing mode control
+  JsonArray haConfigSwing_H_modes = haConfig.createNestedArray(F("swing_h_modes"));
+  haConfigSwing_H_modes.add(F("<<"));
+  haConfigSwing_H_modes.add(F("<"));
+  haConfigSwing_H_modes.add(F("|"));
+  haConfigSwing_H_modes.add(F(">"));
+  haConfigSwing_H_modes.add(F(">>"));
+  haConfigSwing_H_modes.add(F("<>"));
+  haConfigSwing_H_modes.add(F("SWING"));
 
-  JsonObject haConfigDevice = haConfig.createNestedObject("device");
+  haConfig[F("swing_h_mode_cmd_t")] = ha_wide_vane_set_topic;
+  haConfig[F("swing_h_mode_stat_t")] = ha_state_topic;
+  haConfig[F("swing_h_mode_stat_tpl")] = F("{{ value_json.wideVane if (value_json is defined and value_json.wideVane is defined and value_json.wideVane|length) else 'SWING' }}"); // Set default value for fix "Could not parse data for HA"
 
-  haConfigDevice["ids"] = mqtt_fn;
-  haConfigDevice["name"] = mqtt_fn;
-  haConfigDevice["sw"] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice["mdl"] = model;
-  haConfigDevice["mf"] = manufacturer;
-  haConfigDevice["configuration_url"] = "http://" + WiFi.localIP().toString();
+  // action control topic
+  haConfig[F("action_topic")] = ha_state_topic;
+  haConfig[F("action_template")] = F("{{ value_json.action if (value_json is defined and value_json.action is defined and value_json.action|length) else 'idle' }}"); // Set default value for fix "Could not parse data for HA"
+
+  // add device info
+  haConfigureDevice(haConfig);
 
   String mqttOutput;
   serializeJson(haConfig, mqttOutput);
+  String ha_config_topic = haGetConfigTopic("climate");
   mqttClient->publish(ha_config_topic.c_str(), 1, true, mqttOutput.c_str());
+}
+
+void sendHaConfig()
+{
+  // Climate
+  haConfigClimate();
+
   // Button
-  haConfigButton("Restart", "restart", "mdi:restart");
+  haConfigButton(ENT_RESTART_BTN, "restart", "mdi:restart");
   // Temperature sensors
-  haConfigTemp("roomTemperature", "mdi:thermometer");
+  haConfigSensor(ENT_ROOM_TEMPERATURE, "", "mdi:thermometer");
   // Freq sensor
-  haConfigFreq("compressorFreq", "Hz", "mdi:sine-wave");
+  haConfigSensor(ENT_COMPR_FRQ, "Hz", "mdi:sine-wave");
   // Up time
-  haConfigSensor("Up Time", "", "mdi:clock");
+  haConfigSensor(ENT_UP_TIME, "", "mdi:clock", true);
   // HVAC connection state
-  haConfigSensor("Connection state", "", "mdi:check-network");
-  haConfigSensor("Free Heap", "%", "mdi:memory");
-  haConfigSensor("RSSI", "dBm", "mdi:network-strength-1");
-  haConfigSensor("BSSI", "", "mdi:router-wireless");
+  haConfigSensor(ENT_CONNECTION_STATE, "", "mdi:check-network", true);
+  haConfigSensor(ENT_FREE_HEAP, "%", "mdi:memory", true);
+  haConfigSensor(ENT_RSSI, "dBm", "mdi:network-strength-1", true);
+  haConfigSensor(ENT_BSSI, "", "mdi:router-wireless", true);
+  haConfigOption(ENT_WEB_PANEL, "mdi:cog");
 }
 
 void mqttConnect()
@@ -3061,17 +3183,32 @@ String getTemperatureScale()
   }
 }
 
-String getId()
-{
+String getMacAddr(bool keepSeparator) {
 #ifdef ESP32
-  char chipID[23];
-  snprintf(chipID, 23, "%llX", ESP.getEfuseMac());
-  return String(chipID);
+    unsigned char mac_base[6] = {0};
+    esp_read_mac(mac_base, ESP_MAC_WIFI_STA);
+    if (keepSeparator)
+    {
+      char chipID[19];
+      snprintf(chipID, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5]);
+      return String(chipID);
+    }
+
+    char chipID[14];
+    snprintf(chipID, 13, "%02X%02X%02X%02X%02X%02X", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5]);
+    return String(chipID);
 #else
-  String chipID = WiFi.macAddress();
-  chipID.replace(":", "");
-  return chipID;
+    String chipID = WiFi.macAddress();
+    if (!keepSeparator)
+      chipID.replace(":", "");
+    return chipID;
 #endif
+}
+
+const String& getId() {
+  if (unique_id.isEmpty())
+    unique_id = getMacAddr(false);
+  return unique_id;
 }
 
 // Check if header is present and correct
@@ -3313,6 +3450,7 @@ void onMqttConnect(bool sessionPresent)
   mqtt_connected = true;
 
   mqttClient->subscribe(ha_system_set_topic.c_str(), 1);
+  mqttClient->subscribe(ha_system_setting_request.c_str(), 1);
   mqttClient->subscribe(ha_debug_pckts_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_debug_logs_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_mode_set_topic.c_str(), 1);
@@ -3322,6 +3460,7 @@ void onMqttConnect(bool sessionPresent)
   mqttClient->subscribe(ha_wide_vane_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_remote_temp_set_topic.c_str(), 1);
   mqttClient->subscribe(ha_custom_packet.c_str(), 1);
+  mqttClient->subscribe(ha_birth_topic.c_str(), 1);
   // send online message
   mqttClient->publish(ha_availability_topic.c_str(), 1, false, mqtt_payload_available);
   sendHaConfig();
@@ -3495,14 +3634,26 @@ String getCurrentTime()
   tzset();
 
   localtime_r(&now, &timeinfo);
-  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%b %e %Y %H:%M:%S", &timeinfo);
   return String(strftime_buf);
 }
 
-// Time device running without crash or reboot
-String getUpTime()
+time_t getUpTimeSeconds()
 {
-  char uptimeBuffer[64];
+  time_t now;
+
+  if (device_boot_time > 0)
+    return device_boot_time;
+
+  time(&now);
+  // if system time still not set via NTP, we return 0
+  if (now < min_valid_date)
+    return 0;
+
+  // Set timezone to Vietnam Standard Time
+  setenv("TZ", timezone.c_str(), 1);
+  tzset();
+
 #ifdef ESP32
   int64_t microSecondsSinceBoot = esp_timer_get_time();
   int64_t secondsSinceBoot = microSecondsSinceBoot / 1000000;
@@ -3510,12 +3661,23 @@ String getUpTime()
   int32_t milliSecondsSinceBoot = millis(); // 2^32-1 only about 49 day before roll over
   int32_t secondsSinceBoot = milliSecondsSinceBoot / 1000;
 #endif
-  int seconds = (secondsSinceBoot % 60);
-  int minutes = (secondsSinceBoot % 3600) / 60;
-  int hours = (secondsSinceBoot % 86400) / 3600;
-  int days = (secondsSinceBoot % (86400 * 30)) / 86400;
-  sprintf(uptimeBuffer, "%02i:%02i:%02i:%02i", days, hours, minutes, seconds);
-  return String(uptimeBuffer);
+
+  device_boot_time = now - secondsSinceBoot;
+
+  return device_boot_time;
+}
+
+// Time device running without crash or reboot
+String getUpTime()
+{
+  char strftime_buf[64];
+  struct tm timeinfo;
+
+  time_t uptime = getUpTimeSeconds();
+
+  localtime_r(&uptime, &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%b %e %Y %H:%M:%S", &timeinfo);
+  return String(strftime_buf);
 }
 
 #ifdef ESP32
@@ -3564,18 +3726,34 @@ String getBuildDatetime()
 {
   if (build_date_time.isEmpty())
   {
-#ifdef ESP32
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
-    build_date_time = String(app_desc->date) + ", " + String(app_desc->time);
-    return build_date_time;
-#else
     char builDate[64];
     sprintf(builDate, "%s %s", __DATE__, __TIME__);
     build_date_time = String(builDate);
     return build_date_time;
-#endif
   }
   return build_date_time;
+}
+
+uint32_t getFreeHeapBytes()
+{
+#ifdef ESP32
+  uint32_t freeHeapBytes = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+#else
+  uint32_t freeHeapBytes = ESP.getFreeHeap();
+#endif
+
+return freeHeapBytes;
+}
+
+uint32_t getTotalHeapBytes()
+{
+#ifdef ESP32
+  uint32_t totalHeapBytes = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+#else
+  uint32_t totalHeapBytes = 64000;
+#endif
+
+return totalHeapBytes;
 }
 
 bool isSecureEnable()
@@ -3613,8 +3791,27 @@ void getWifiList()
     }
     int32_t rssi = WiFi.RSSI(i);
     if (rssi > top_k_rssi[min_index]) {
-      top_k_rssi[min_index] = rssi;
-      top_k_idx[min_index] = i;
+      // check for ssid with same name in the list
+      String bssi = WiFi.SSID(i);
+      bool found = false;
+      for (int j = 0; j < k; j++) {
+        if (top_k_rssi[j] == INT32_MIN)
+          break;
+        // replace exixting if better rssi
+        if (bssi == WiFi.SSID(top_k_idx[j])) {
+          if (rssi > top_k_rssi[j]) {
+            top_k_rssi[j] = rssi;
+            top_k_idx[j] = i;
+          }
+          found = true;
+          break;
+        }
+      }
+      if (!found)
+      {
+        top_k_rssi[min_index] = rssi;
+        top_k_idx[min_index] = i;
+      }
     }
   }
 
@@ -3631,19 +3828,17 @@ void getWifiList()
   wifi_list.clear();
   for (int i = 0; i < k; ++i) // only first 5 networkd
   {
+    if (top_k_rssi[i] == INT32_MIN)
+      break;
     int idx = top_k_idx[i];
     String ssid = WiFi.SSID(idx);
     if (!ssid.isEmpty())
     {
       ESP_LOGI(TAG, "Found %s: ", ssid.c_str());
-      if (i == 0)
-      {
-        wifi_list += ssid;
+      if (!wifi_list.isEmpty()) {
+        wifi_list += ";";
       }
-      else
-      {
-        wifi_list += ";" + ssid;
-      }
+      wifi_list += ssid;
     }
   }
   WiFi.scanDelete();
