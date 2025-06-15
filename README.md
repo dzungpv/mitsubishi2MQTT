@@ -6,9 +6,9 @@ ESP8266/ESP32 module to control Mitsubishi Electric HVAC unit. Support control w
 ***
 
 ## Screenshots:
-| ![Main](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/ha_ui_climate.jpeg) | ![Control](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/control_page.jpeg) | ![Config](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/config_page.jpeg) |
+| ![Main](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/ha_ui_climate.jpeg) | ![Control](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/control_page.jpeg) | ![Config](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/config_page.jpeg) |
 | --------------------------------------- | --------------------------------------- | --------------------------------------- |                                
-| ![Init](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/ha_ui_mqtt.jpeg) | ![Unit](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/unit_page.jpeg) | ![Status](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/images/status_page.jpeg) |
+| ![Init](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/ha_ui_mqtt.jpeg) | ![Unit](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/unit_page.jpeg) | ![Status](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/images/status_page.jpeg) |
 
 ***
 
@@ -23,11 +23,11 @@ ESP8266/ESP32 module to control Mitsubishi Electric HVAC unit. Support control w
 ***
 
 ## Supported Mitsubishi Electrict Units
-Basically, if the unit has a [`CN105`](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/CN105.jpg) header on the main board, it should
+Basically, if the unit has a [`CN105`](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/hardware/CN105.jpg) header on the main board, it should
 work. The [HeatPump
 wiki](https://github.com/SwiCago/HeatPump/wiki/Supported-models) has a long confirmed list.
 
-The same [`CN105`](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/CN105.jpg) connector is used by the Mitsubishi KumoCloud remotes, which
+The same [`CN105`](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/hardware/CN105.jpg) connector is used by the Mitsubishi KumoCloud remotes, which
 have a
 [compatibility list](https://www.mitsubishicomfort.com/themes/custom/MitsubishiMegaSite/src/pdf/M_Submittal_kumo_cloud.pdf)
 available.
@@ -39,10 +39,10 @@ The software and hardware has been tested by the author for 5 years on the follo
 
 ## Demo Circuit
 
-<img src="https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/CN105_ESP8266.png"/>
+<img src="https://github.com/dzungpv/mitsubishi2MQTT/blob/main/hardware/CN105_ESP8266.png"/>
 
-This circuit using by the author (ESP8266), here is some [boards](https://github.com/dzungpv/mitsubishi2MQTT/blob/master/hardware/Before_Install.jpg) before install.
-More pictures in [`hardware`](https://github.com/dzungpv/mitsubishi2MQTT/tree/master/hardware) folder.
+This circuit using by the author (ESP8266), here is some [boards](https://github.com/dzungpv/mitsubishi2MQTT/blob/main/hardware/Before_Install.jpg) before install.
+More pictures in [`hardware`](https://github.com/dzungpv/mitsubishi2MQTT/tree/main/hardware) folder.
 
 You can also use `ESP32` (including ESP32-S2, ESP32-S3 and ESP32-C3) module for more processing power:
 - ESP32 by default app use **UART0** (TX - GPIO 1, RX - GPIO 3)
