@@ -15,6 +15,11 @@ jobs:
         with:
           submodules: 'recursive'
           path: ${{ github.workspace }}/app
+          
+      - name: Set uppercase TARGET env
+        run: echo "TARGET_UPPER=${TARGET^^}" >> $GITHUB_ENV
+        env:
+          TARGET: ${{ matrix.target }}
 
       - name: esp-idf build (${{ matrix.target }})
         uses: espressif/esp-idf-ci-action@v1
@@ -26,11 +31,11 @@ jobs:
             apt-get update && apt-get install -y python3-venv
             idf.py build
             cd build
-            esptool.py --chip ${{ matrix.target }} merge_bin -o mitsubishi2MQTT_${{ matrix.target }}_IDF.bin @flash_args
+            esptool.py --chip ${{ matrix.target }} merge_bin -o mitsubishi2MQTT_${{ env.TARGET_UPPER }}_IDF.bin @flash_args
 
       - name: Upload ${{ matrix.target }} artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mitsubishi2MQTT_${{ matrix.target }}_IDF.bin
+          name: mitsubishi2MQTT_${{ env.TARGET_UPPER }}_IDF.bin
           path: |
-            ${{ github.workspace }}/app/build/mitsubishi2MQTT_${{ matrix.target }}_IDF.bin
+            ${{ github.workspace }}/app/build/mitsubishi2MQTT_${{ env.TARGET_UPPER }}_IDF.bin
