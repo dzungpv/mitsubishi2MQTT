@@ -1,0 +1,36 @@
+on:
+  push:
+  schedule:
+    - cron: "0 2 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [esp32, esp32s2, esp32s3, esp32c3]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          path: ${{ github.workspace }}/app
+
+      - name: esp-idf build (${{ matrix.target }})
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v4.4.6
+          target: ${{ matrix.target }}
+          path: app
+          command: |
+            apt-get update && apt-get install -y python3-venv
+            idf.py build
+            cd build
+            esptool.py --chip ${{ matrix.target }} merge_bin -o mitsubishi2MQTT_${{ matrix.target }}_IDF.bin @flash_args
+
+      - name: Upload ${{ matrix.target }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitsubishi2MQTT_${{ matrix.target }}_IDF.bin
+          path: |
+            ${{ github.workspace }}/app/build/mitsubishi2MQTT_${{ matrix.target }}_IDF.bin
