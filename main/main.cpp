@@ -1002,8 +1002,14 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   String footer = FPSTR(html_common_footer);
   footer.replace(F("_APP_NAME_"), appName);
   footer.replace(F("_UNIT_NAME_"), hostname);
-  footer.replace(F("_VERSION_"), getAppVersion() + F(" (") + String(ARDUINO_BOARD) + F(")"));
-
+  #ifdef ESP32
+  String hardware = String(CONFIG_IDF_TARGET);
+  hardware.toUpperCase();
+#else
+  String hardware = String(ARDUINO_BOARD);
+#endif
+  footer.replace(F("_VERSION_"), getAppVersion() + F(" (") + hardware + F(")"));
+  
   if (html_response != NULL)
   {
     delete[] html_response; // cleanup memory when send completed
@@ -2743,7 +2749,13 @@ void haConfigureDevice(DynamicJsonDocument &haConfig)
   // other device infos
   haConfigDevice[F("name")] = mqtt_fn;
   haConfigDevice[F("sw")] = String(appName) + " " + String(getAppVersion());
-  haConfigDevice[F("hw")] = String(ARDUINO_BOARD);  
+#ifdef ESP32
+  String hardware = String(CONFIG_IDF_TARGET);
+  hardware.toUpperCase();
+#else
+  String hardware = String(ARDUINO_BOARD);
+#endif
+  haConfigDevice[F("hw")] = hardware;
   haConfigDevice[F("mdl")] = model;
   haConfigDevice[F("mf")] = manufacturer;
   haConfigDevice[F("cu")] = "http://" + WiFi.localIP().toString();
