@@ -225,6 +225,7 @@ String mqtt_root_ca_cert;
 String mqtt_client_id;
 const PROGMEM char *mqtt_payload_available = "online";
 const PROGMEM char *mqtt_payload_unavailable = "offline";
+const PROGMEM char *default_mqtt_topic = "mitsubishi2mqtt";
 
 // Define global variables for Others settings
 bool others_haa;
