@@ -642,8 +642,7 @@ void saveMqtt(String mqttFn, const String& mqttHost, String mqttPort, const Stri
   if (mqttTopic.isEmpty())
   {
     // set default topic if empty
-    mqttTopic += getId();
-    mqttTopic.toLowerCase();
+    mqttTopic = default_mqtt_topic;
   }
   doc["mqtt_fn"] = mqttFn;
   doc["mqtt_host"] = mqttHost;
@@ -3116,37 +3115,42 @@ bool connectWifi()
     ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
     wifi_timeout = millis() + 30000;
     while (WiFi.status() != WL_CONNECTED && millis() < wifi_timeout)
-	{
-        ESP_LOGD(TAG, ".");
-        // Serial.print(WiFi.status());
-        //  wait 500ms, flashing the blue LED to indicate WiFi connecting...
-        digitalWrite(blueLedPin, LOW);
-        delay(250);
-        digitalWrite(blueLedPin, HIGH);
-        delay(250);
+    {
+      ESP_LOGD(TAG, ".");
+      // Serial.print(WiFi.status());
+      //  wait 500ms, flashing the blue LED to indicate WiFi connecting...
+      digitalWrite(blueLedPin, LOW);
+      delay(250);
+      digitalWrite(blueLedPin, HIGH);
+      delay(250);
     }
     if (WiFi.status() != WL_CONNECTED)
-	{
-        ESP_LOGD(TAG, "Failed to connect to wifi");
-        return false;
+    {
+      ESP_LOGD(TAG, "Failed to connect to wifi");
+      return false;
     }
     ESP_LOGD(TAG, "Connected to %s", ap_ssid.c_str());
     ESP_LOGD(TAG, "Ready, IP address: ");
     unsigned long dhcpStartTime = millis();
     while ((WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "") && millis() - dhcpStartTime < 5000)
-	{
-        ESP_LOGD(TAG, ".");
-        delay(500);
+    {
+      ESP_LOGD(TAG, ".");
+      delay(500);
     }
     if (WiFi.localIP().toString() == "0.0.0.0" || WiFi.localIP().toString() == "")
-	{
-        ESP_LOGD(TAG, "Failed to get IP address");
-        return false;
+    {
+      ESP_LOGD(TAG, "Failed to get IP address");
+      return false;
     }
     ESP_LOGD(TAG, "%s", WiFi.localIP().toString().c_str());
     ticker.detach();  // Stop blinking the LED because now we are connected:)
+#ifdef ESP32
+    // keep LED off
+    digitalWrite(blueLedPin, LOW);
+#else
     // keep LED off (For Wemos D1-Mini), Other board check the schematic
     digitalWrite(blueLedPin, HIGH);
+#endif
     // Auto reconnected
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
@@ -3407,8 +3411,8 @@ void WiFiEvent(WiFiEvent_t event)
     {
       mqtt_reconnect_timeout = millis() + MQTT_RECONNECT_INTERVAL_MS; // only retry next 5 seconds to prevent crash
       ticker.detach();                                                // Stop blinking the LED because now we are connected:)
-      // keep LED off (For Wemos D1-Mini), Other board check the schematic
-      digitalWrite(blueLedPin, HIGH);
+      // keep LED off (check the schematic)
+      digitalWrite(blueLedPin, LOW);
       xTimerStart(mqttReconnectTimer, 0); // start timer to connect to MQTT
       // init and get the time
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer.c_str());
