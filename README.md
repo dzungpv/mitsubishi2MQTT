@@ -2,6 +2,7 @@
 ESP8266/ESP32 module to control Mitsubishi Electric HVAC unit. Support control with Home Assistant, buit-in web app and MQTT.
 
 ![build status](https://github.com/dzungpv/mitsubishi2MQTT/actions/workflows/build.yml/badge.svg)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dzungpv/mitsubishi2MQTT)
 
 ***
 
