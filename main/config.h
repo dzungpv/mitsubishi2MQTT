@@ -147,6 +147,9 @@ size_t ota_content_len;
 // For Asynce reboot after timeout
 bool requestReboot = false;
 unsigned long requestRebootTime = 0;
+// For MQTTAsync hp update callback
+bool requestHpUpdate = false;
+unsigned long requestHpUpdateTime = 0;
 // For async wifi scan
 bool requestWifiScan = false;
 unsigned long requestWifiScanTime = 0;

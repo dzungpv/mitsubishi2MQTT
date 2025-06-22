@@ -99,6 +99,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 
 void sendRebootRequest(unsigned long nextSeconds);
 void checkRebootRequest();
+void checkHpUpdateRequest();
 void checkWifiScanRequest();
 
 String getWifiOptions(bool send);
@@ -2118,10 +2119,20 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
     settings.wideVane = request->arg(F("WIDEVANE")).c_str();
     update = true;
   }
-
   if (update)
+  {
     hp.setSettings(settings);
-
+    if (hp.getSettings() == hp.getWantedSettings()) // only update it settings change
+    {
+      ESP_LOGW(TAG, "Same Settings to HP, Igrore");
+    }
+    else
+    {
+      ESP_LOGI(TAG, "Send Settings to HP");
+      requestHpUpdate = true;
+      requestHpUpdateTime = millis() + 10;
+    }
+  }
   return settings;
 }
 
@@ -2649,6 +2660,17 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
     mqttClient->publish(ha_debug_logs_topic.c_str(), 1, false, msg.c_str());
   }
 
+  if (update)
+  {
+    if (hp.getSettings() == hp.getWantedSettings()) // only update it settings change
+    {
+      ESP_LOGW(TAG, "Same Settings to HP, Igrore");
+    } else {
+      ESP_LOGI(TAG, "Send Settings to HP");
+      requestHpUpdate = true;
+      requestHpUpdateTime = millis() + 10;
+    }
+  }
   delete[] message;
 }
 
@@ -3274,6 +3296,7 @@ void loop()
 #ifdef ESP8266
     MDNS.update(); // ESP32 working without call this
 #endif
+    checkHpUpdateRequest();
     checkWifiScanRequest();
     // Sync HVAC UNIT
     if (!hp.isConnected())
@@ -3344,6 +3367,17 @@ void checkRebootRequest()
     requestRebootTime = 0;
     ESP_LOGI(TAG, "Restart device from request");
     ESP.restart();
+  }
+}
+
+void checkHpUpdateRequest()
+{
+  if (requestHpUpdate and (millis() > requestHpUpdateTime))
+  {
+    requestHpUpdate = false;
+    requestHpUpdateTime = 0;
+    ESP_LOGI(TAG, "Update HP from request");
+    hp.update();
   }
 }
 
