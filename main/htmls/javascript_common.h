@@ -189,6 +189,7 @@ const char control_script_events[] PROGMEM =
           "if (!!window.EventSource) {"
            "var source = new EventSource('/events');"
  
+#if CONFIG_ENABLE_HP_DEBUG
            "source.addEventListener('open', function(e) {"
             "console.log('Events Connected');"
            "}, false);"
@@ -201,44 +202,57 @@ const char control_script_events[] PROGMEM =
            "source.addEventListener('message', function(e) {"
             "console.log('message', e.data);"
            "}, false);"
+#endif
  
            "source.addEventListener('temperature', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('temperature', e.data);"
+#endif
+            "if (window.location.search != '') {"
+              "window.location.search = '';"
+            "}"
             "document.getElementById('TEMP').value = e.data;"
            "}, false);"
  
            "source.addEventListener('room_temperature', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('Room temperature', e.data);"
+#endif
             "document.getElementById('room_temperature').innerHTML = e.data;"
            "}, false);"
  
-            "source.addEventListener('preset', function(e) {"
-            "console.log('Preset', e.data);"
-            "document.getElementById('PRESET').value = e.data;"
-           "}, false);"
-
             "source.addEventListener('power', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('POWER', e.data);"
+#endif
             "document.getElementById('POWER').checked = (e.data == 'ON' ? true: false);"
            "}, false);"
 
             "source.addEventListener('mode', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('Mode', e.data);"
+#endif
             "document.getElementById('MODE').value = e.data;"
            "}, false);"
  
             "source.addEventListener('fan', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('Fan', e.data);"
+#endif
             "document.getElementById('FAN').value = e.data;"
            "}, false);"
 
            "source.addEventListener('vane', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('Vane', e.data);"
+#endif
             "document.getElementById('VANE').value = e.data;"
            "}, false);"
 
             "source.addEventListener('wideVane', function(e) {"
+#if CONFIG_ENABLE_HP_DEBUG
             "console.log('Wide vane', e.data);"
+#endif
             "document.getElementById('WIDEVANE').value = e.data;"
            "}, false);"
           "}"
