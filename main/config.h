@@ -169,6 +169,8 @@ const PROGMEM char *console_file = "/console.log";
 const PROGMEM char *others_conf = "/others.json";
 // pinouts
 const PROGMEM uint8_t blueLedPin = 2; // The ESP32 has an internal blue LED at D2 (GPIO 02)
+// keep LED off (check board schematic)
+uint8_t blueLedDisabled = LOW;
 #else
 const PROGMEM char *wifi_conf = "wifi.json";
 const PROGMEM char *mqtt_conf = "mqtt.json";
@@ -177,6 +179,8 @@ const PROGMEM char *console_file = "console.log";
 const PROGMEM char *others_conf = "others.json";
 // pinouts
 const PROGMEM uint8_t blueLedPin = LED_BUILTIN; // Onboard LED = digital pin 2 "D4" (blue LED on WEMOS D1-Mini)
+// keep LED off (For Wemos D1-Mini), Other board check the schematic
+uint8_t blueLedDisabled = HIGH;
 #endif
 const PROGMEM uint8_t redLedPin = 0;
 
