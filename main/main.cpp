@@ -267,7 +267,6 @@ void setup()
     hp.setPacketCallback(hpPacketDebug);
     // Allow Remote/Panel
     hp.enableExternalUpdate();
-    hp.enableAutoUpdate();
 #if defined(ESP32)
     if (HP_TX > 0 && HP_RX > 0)
     {
