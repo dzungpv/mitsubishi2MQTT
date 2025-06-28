@@ -3143,13 +3143,8 @@ bool connectWifi()
     }
     ESP_LOGD(TAG, "%s", WiFi.localIP().toString().c_str());
     ticker.detach();  // Stop blinking the LED because now we are connected:)
-#ifdef ESP32
     // keep LED off
-    digitalWrite(blueLedPin, LOW);
-#else
-    // keep LED off (For Wemos D1-Mini), Other board check the schematic
-    digitalWrite(blueLedPin, HIGH);
-#endif
+    digitalWrite(blueLedPin, blueLedDisabled);
     // Auto reconnected
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
@@ -3410,8 +3405,8 @@ void WiFiEvent(WiFiEvent_t event)
     {
       mqtt_reconnect_timeout = millis() + MQTT_RECONNECT_INTERVAL_MS; // only retry next 5 seconds to prevent crash
       ticker.detach();                                                // Stop blinking the LED because now we are connected:)
-      // keep LED off (check the schematic)
-      digitalWrite(blueLedPin, LOW);
+      // keep LED off
+      digitalWrite(blueLedPin, blueLedDisabled);
       xTimerStart(mqttReconnectTimer, 0); // start timer to connect to MQTT
       // init and get the time
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer.c_str());
@@ -3446,8 +3441,8 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
   {
     mqtt_reconnect_timeout = millis() + MQTT_RECONNECT_INTERVAL_MS; // only retry next 5 seconds to prevent crash
     ticker.detach();                                                // Stop blinking the LED because now we are connected:)
-    // keep LED off (For Wemos D1-Mini), Other board check the schematic
-    digitalWrite(blueLedPin, HIGH);
+    // keep LED off
+    digitalWrite(blueLedPin, blueLedDisabled);
     mqttConnect();
     // init and get the time
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
