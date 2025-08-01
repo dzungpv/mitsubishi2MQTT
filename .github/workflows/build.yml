@@ -23,9 +23,15 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
+      - name: Update pip and setuptools
+        run: python -m pip install --upgrade pip setuptools
           
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
+
+      - name: Fix permissions for esptool
+        run: chmod +x ~/.platformio/packages/tool-esptoolpy/esptool.py || true
 
       - name: Build Generic8266(ESP-01)
         run: |
