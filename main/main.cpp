@@ -78,7 +78,8 @@ String getTemperatureScale();
 String getMacAddr(bool keepSeparator = true);
 const String& getId();
 bool is_authenticated(AsyncWebServerRequest *request);
-void checkLogin(AsyncWebServerRequest *request);
+void redirectLoginPage(AsyncWebServerRequest *request);
+bool checkLogin(AsyncWebServerRequest *request);
 // AsyncMQTT
 #ifdef ESP32
 void WiFiEvent(WiFiEvent_t event);
@@ -281,7 +282,7 @@ void setup()
 #else
     hp.connect(&Serial);
 #endif
-    hp.setFastSync(true); // enable fast sync because we are not care about timer and other package
+    hp.setFastSync(true); // enable fast sync because we are not care about timer and other package 
     MDNS.addService("http", "tcp", 80);
   }
   else
@@ -1049,7 +1050,9 @@ void handleNotFound(AsyncWebServerRequest *request)
 
 void handleSaveWifiAndMqtt(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   ESP_LOGD(TAG, "Saving wifi and mqtt config");
   if (request->hasArg("submit"))
   {
@@ -1081,7 +1084,9 @@ void handleSaveWifiAndMqtt(AsyncWebServerRequest *request)
 
 void handleReboot(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   ESP_LOGD(TAG, "Rebooting");
   String initRebootPage = FPSTR(html_init_reboot);
   // localize
@@ -1092,7 +1097,9 @@ void handleReboot(AsyncWebServerRequest *request)
 
 void handleRoot(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("REBOOT"))
   {
     String rebootPage = FPSTR(html_page_reboot);
@@ -1189,7 +1196,9 @@ void handleInitSetup(AsyncWebServerRequest *request)
 
 void handleSetup(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("RESET"))
   {
     String resetPage = FPSTR(html_page_reset);
@@ -1219,7 +1228,9 @@ void handleSetup(AsyncWebServerRequest *request)
 
 void handleOthers(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("save"))
   {
     saveOthers(request->arg("HAA"), request->arg("haat"), request->arg("DebugPckts"), request->arg("DebugLogs"), request->arg("web_p"), request->arg("tx_pin"), request->arg("rx_pin"), request->arg("tz"), request->arg("ntp"));
@@ -1299,7 +1310,9 @@ void handleOthers(AsyncWebServerRequest *request)
 
 void handleMqtt(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("save"))
   {
     saveMqtt(request->arg("fn"), request->arg("mh"), request->arg("ml"), request->arg("mu"), request->arg("mp"), request->arg("mt"), request->arg("mrcc"));
@@ -1343,7 +1356,9 @@ void handleMqtt(AsyncWebServerRequest *request)
 
 void handleUnit(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("save"))
   {
     String loginPassword = request->arg("lpw");
@@ -1433,7 +1448,9 @@ void handleUnit(AsyncWebServerRequest *request)
 
 void handleWifi(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   if (request->hasArg("save"))
   {
     String ssid = request->arg("ssid");
@@ -1668,7 +1685,9 @@ String getWideVaneSelect(const String &curr_status)
 
 void handleControl(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   // not connected to hp, redirect to status page
   if (!hp.isConnected())
   {
@@ -1892,7 +1911,9 @@ void handleLogin(AsyncWebServerRequest *request)
 
 void handleUpgrade(AsyncWebServerRequest *request)
 {
-  checkLogin(request);
+  if (!checkLogin(request)) {
+      return;
+  }
   uploaderror = 0;
   String upgradePage = FPSTR(html_page_upgrade);
   // localize
@@ -3244,10 +3265,8 @@ bool is_authenticated(AsyncWebServerRequest *request)
   return false;
 }
 
-void checkLogin(AsyncWebServerRequest *request)
+void redirectLoginPage(AsyncWebServerRequest *request)
 {
-  if (!is_authenticated(request) and login_password.length() > 0)
-  {
     // use javascript in the case browser disable redirect
     String redirectPage = F("<html lang=\"en\" class=\"\"><head><meta charset='utf-8'>");
     redirectPage += F("<script>");
@@ -3260,8 +3279,16 @@ void checkLogin(AsyncWebServerRequest *request)
     response->addHeader("Location", "/login");
     response->addHeader("Cache-Control", "no-cache");
     request->send(response);
-    return;
+}
+
+bool checkLogin(AsyncWebServerRequest *request)
+{
+  if (!is_authenticated(request) && login_password.length() > 0)
+  {
+    redirectLoginPage(request);
+    return false;
   }
+  return true;
 }
 
 void loop()

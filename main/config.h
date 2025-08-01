@@ -16,6 +16,7 @@
 #include "FS.h" // SPIFFS for store config
 #ifdef ESP32
 #include <WiFi.h> // WIFI for ESP32
+#include "esp_mac.h"  // mac address
 #include <WiFiUdp.h>
 #include <ESPmDNS.h>  // mDNS for ESP32
 #include <AsyncTCP.h> // ESPAsyncWebServer for ESP32
