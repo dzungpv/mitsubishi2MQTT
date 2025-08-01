@@ -2440,10 +2440,26 @@ void mqttCallback(const char *topic, const uint8_t *payload, const unsigned int 
   {
     String modeUpper = message;
     modeUpper.toUpperCase();
-    if (modeUpper == "OFF")
-    {
-      hp.setPowerSetting(modeUpper.c_str());
-      update = true;
+    if (modeUpper == "OFF") {
+        hp.setPowerSetting(modeUpper.c_str());
+        update = true;
+    } else if (modeUpper == "ON") {
+        // Set temp and mode
+        heatpumpSettings currentSettings = hp.getSettings();
+        hp.setModeSetting(currentSettings.mode);
+        rootInfo["mode"] = hpGetMode(currentSettings);
+        //
+        float temperature_c = convertLocalUnitToCelsius(currentSettings.temperature, useFahrenheit);
+        if (temperature_c < min_temp || temperature_c > max_temp) {
+            temperature_c = 23;
+            rootInfo["temperature"] = convertCelsiusToLocalUnit(temperature_c, useFahrenheit);
+        } else {
+            rootInfo["temperature"] = temperature_c;
+        }
+        hp.setTemperature(temperature_c);
+        hp.setPowerSetting(modeUpper.c_str());
+        hpSendLocalState();
+        update = true;
     }
   }
   else if (strcmp(topic, ha_mode_set_topic.c_str()) == 0)
