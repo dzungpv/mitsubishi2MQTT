@@ -12,9 +12,6 @@
 [submodule "components/HeatPump"]
 	path = components/HeatPump
 	url = https://github.com/dzungpv/HeatPump
-[submodule "components/ESPAsyncTCP"]
-	path = components/ESPAsyncTCP
-	url = https://github.com/ESP32Async/ESPAsyncTCP.git
 [submodule "components/ESPAsyncWebServer"]
 	path = components/ESPAsyncWebServer
 	url = https://github.com/ESP32Async/ESPAsyncWebServer.git

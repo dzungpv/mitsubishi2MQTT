@@ -1066,7 +1066,9 @@ void handleNotFound(AsyncWebServerRequest *request)
     String menuRootPage = FPSTR(html_menu_root);
     menuRootPage.replace(F("_SHOW_LOGOUT_"), (String)(login_password.length() > 0));
     // not show control button if hp not connected
+    #if 0
     menuRootPage.replace(F("_SHOW_CONTROL_"), (String)(hp.isConnected()));
+    #endif
     sendWrappedHTML(request, menuRootPage);
   }
 }
@@ -1146,7 +1148,9 @@ void handleRoot(AsyncWebServerRequest *request)
     // set data
     menuRootPage.replace(F("_SHOW_LOGOUT_"), (String)(login_password.length() > 0));
     // not show control button if hp not connected
+    #if 0
     menuRootPage.replace(F("_SHOW_CONTROL_"), (String)(hp.isConnected()));
+    #endif
     sendWrappedHTML(request, menuRootPage);
   }
 }
@@ -1712,6 +1716,7 @@ void handleControl(AsyncWebServerRequest *request)
       return;
   }
   // not connected to hp, redirect to status page
+  #if 0
   if (!hp.isConnected())
   {
     AsyncWebServerResponse *response = request->beginResponse(301);
@@ -1720,6 +1725,7 @@ void handleControl(AsyncWebServerRequest *request)
     request->send(response);
     return;
   }
+  #endif
 
   heatpumpSettings settings = hp.getSettings();
   if (hpSettingsValid(settings)) {
