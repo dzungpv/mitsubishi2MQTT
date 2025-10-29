@@ -998,7 +998,7 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   String footer = FPSTR(html_common_footer);
   footer.replace(F("_APP_NAME_"), appName);
   footer.replace(F("_UNIT_NAME_"), hostname);
-  #ifdef ESP32
+#ifdef ESP32
   String hardware = String(CONFIG_IDF_TARGET);
   hardware.toUpperCase();
 #else
@@ -1013,8 +1013,9 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
 #ifdef ESP32
   response += content;
   response += footer;
-  request->send(200, "text/html", response);
+  request->send_P(200, "text/html", response);
 #else
+ // for ESP8266
   if (html_response != NULL)
   {
     delete[] html_response; // cleanup memory when send completed
@@ -1595,7 +1596,7 @@ void handleStatus(AsyncWebServerRequest *request)
 
 String getSelectStatus(const String &curr_status, const String &status)
 {
-  if (curr_status.isEmpty())
+  if (curr_status.isEmpty() || status.isEmpty())
     return F("");
   if (curr_status == status)
     return F("selected");
@@ -1719,23 +1720,38 @@ void handleControl(AsyncWebServerRequest *request)
 
   htmlControlPage.replace(F("_TXT_F_ON_"), translatedWord(FL_(txt_f_on)));
   htmlControlPage.replace(F("_TXT_F_OFF_"), translatedWord(FL_(txt_f_off)));
-  // set data
-  htmlControlPage.replace(F("_ROOMTEMP_"), String(convertCelsiusToLocalUnit(hp.getRoomTemperature(), useFahrenheit)));
+  // set data - with safety checks
+  float roomTemp = hp.getRoomTemperature();
+  float targetTemp = hp.getTemperature();
+  
+  // Validate temperature values before conversion
+  if (isnan(roomTemp) || roomTemp < -50.0f || roomTemp > 100.0f) {
+    roomTemp = 20.0f; // Default safe temperature
+  }
+  if (isnan(targetTemp) || targetTemp < -50.0f || targetTemp > 100.0f) {
+    targetTemp = 20.0f; // Default safe temperature
+  }
+  
+  htmlControlPage.replace(F("_ROOMTEMP_"), String(convertCelsiusToLocalUnit(roomTemp, useFahrenheit)));
   htmlControlPage.replace(F("_TEMP_SCALE_"), getTemperatureScale());
-  htmlControlPage.replace(F("_TEMP_"), String(convertCelsiusToLocalUnit(hp.getTemperature(), useFahrenheit)));
+  htmlControlPage.replace(F("_TEMP_"), String(convertCelsiusToLocalUnit(targetTemp, useFahrenheit)));
 
-  if (!(String(settings.power).isEmpty())) // null may crash with multitask
+  if (settings.power != nullptr && !(String(settings.power).isEmpty())) // null may crash with multitask
   {
     htmlControlPage.replace(F("_POWER_"), strcmp(settings.power, "ON") == 0 ? F("checked") : F(""));
+  }
+  else
+  {
+    htmlControlPage.replace(F("_POWER_"), F(""));
   }
 
   controlPage += htmlControlPage;
   htmlControlPage = "";
 
-  controlPage += getModeSelect(String(settings.mode));
-  controlPage += getFanSelect(String(settings.fan));
-  controlPage += getVaneSelect(String(settings.vane));
-  controlPage += getWideVaneSelect(String(settings.wideVane));
+  controlPage += getModeSelect(settings.mode != nullptr ? String(settings.mode) : String(""));
+  controlPage += getFanSelect(settings.fan != nullptr ? String(settings.fan) : String(""));
+  controlPage += getVaneSelect(settings.vane != nullptr ? String(settings.vane) : String(""));
+  controlPage += getWideVaneSelect(settings.wideVane != nullptr ? String(settings.wideVane) : String(""));
   
   htmlControlPage = FPSTR(html_page_control_footer); 
   htmlControlPage.replace(F("_TXT_BACK_"), translatedWord(FL_(txt_back)));
@@ -2103,42 +2119,62 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
 
   if (request->hasArg(F("PWRCHK")))
   {
-    settings.power = request->hasArg(F("POWER")) ? "ON" : "OFF";
-    update = true;
+    String powerArg = request->arg(F("POWER")); 
+    if (!powerArg.isEmpty()) {
+      settings.power = powerArg.c_str();
+      update = true;
+    }
   }
   if (request->hasArg(F("MODE")))
   {
     //ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
-    settings.mode = request->arg(F("MODE")).c_str();
+    String modeArg = request->arg(F("MODE"));
+    if (!modeArg.isEmpty()) {
+      settings.mode = modeArg.c_str();
+	  update = true;
+    }
     //ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
-    update = true;
 
   }
   if (request->hasArg(F("TEMP")))
   {
-    float new_temp = convertLocalUnitToCelsius(request->arg(F("TEMP")).toFloat(), useFahrenheit);
-    if (new_temp != settings.temperature)
+    String tempArg = request->arg(F("TEMP"));
+    if (!tempArg.isEmpty())
     {
-      settings.temperature = new_temp;
-      update = true;
+      float new_temp = convertLocalUnitToCelsius(tempArg.toFloat(), useFahrenheit);
+      // Validate temperature range to prevent crashes
+      if (new_temp >= min_temp && new_temp <= max_temp && new_temp != settings.temperature)
+      {
+        settings.temperature = new_temp;
+        update = true;
+      }
     }
   }
   if (request->hasArg(F("FAN")))
   {
     //ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
-    settings.fan = request->arg(F("FAN")).c_str();
+    String fanArg = request->arg(F("FAN"));
+    if (!fanArg.isEmpty()) {
+      settings.fan = fanArg.c_str();
+	  update = true;
+    }
     //ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
-    update = true;
   }
   if (request->hasArg(F("VANE")))
   {
-    settings.vane = request->arg(F("VANE")).c_str();
-    update = true;
+    String vaneArg = request->arg(F("VANE"));
+    if (!vaneArg.isEmpty()) {
+      settings.vane = vaneArg.c_str();
+	  update = true;
+    }
   }
   if (request->hasArg(F("WIDEVANE")))
   {
-    settings.wideVane = request->arg(F("WIDEVANE")).c_str();
-    update = true;
+    String wideVaneArg = request->arg(F("WIDEVANE"));
+    if (!wideVaneArg.isEmpty()) {
+      settings.wideVane = wideVaneArg.c_str();
+	  update = true;
+    }
   }
   if (update)
   {
