@@ -123,6 +123,7 @@ String getWifiBSSID();
 void sendDeviceInfo();
 const char* getEntityTag(byte tag_id);
 const char* getEntityName(byte tag_id);
+bool hpSettingsValid(heatpumpSettings hpSettings);
 // End  header for build with IDF and Platformio
 
 #ifdef ESP8266
@@ -252,7 +253,16 @@ void setup()
         server.addHandler(&ws);
 #endif
         // event source client
-        events.onConnect([](AsyncEventSourceClient *client) { client->send("hello!", NULL, millis(), 1000); });
+        events.onConnect([](AsyncEventSourceClient *client) { 
+          if (client != nullptr) {
+            client->send("hello!", NULL, millis(), 1000);
+          }
+        });
+        events.onDisconnect([](AsyncEventSourceClient *client) { 
+          if (client != nullptr) {
+            ESP_LOGI(TAG, "Disconnected from client");
+          }
+        });
         server.addHandler(&events);
         server.begin();
     }
@@ -1010,27 +1020,39 @@ void sendWrappedHTML(AsyncWebServerRequest *request, const String &content)
   response.replace(F("_APP_NAME_"), appName);
   response.replace(F("_UNIT_NAME_"), hostname);
 
-#ifdef ESP32
   response += content;
   response += footer;
-  request->send_P(200, "text/html", response);
-#else
- // for ESP8266
-  if (html_response != NULL)
-  {
-    delete[] html_response; // cleanup memory when send completed
-    html_response = NULL;
-  }
-  html_resp_length = response.length() + content.length() + footer.length();
-  html_response = new char[html_resp_length + 1];
-  memcpy(html_response, response.c_str(), response.length());
-  u_int16_t index = response.length();
-  memcpy(html_response + index, content.c_str(), content.length());
-  index += content.length();
-  memcpy(html_response + index, footer.c_str(), footer.length());
-  html_response[html_resp_length] = '\0';
-  request->send_P(200, "text/html", html_response);
-#endif
+  
+  // Capture the response String by value to ensure it remains valid during chunked transfer
+  // The lambda will make a copy of the String, keeping the data valid
+  size_t htmlContentLength = response.length();
+  AsyncWebServerResponse *chunk_response = request->beginChunkedResponse("text/html", [htmlContentLength, response](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+      // Check if we're done
+      if (index >= htmlContentLength) {
+          return 0;
+      }
+      // Get the response data pointer (safe because response is captured by value)
+      const char* responsePtr = response.c_str();
+      if (responsePtr == nullptr) {
+          return 0;
+      }
+      // Calculate how much we can send in this chunk
+      size_t remaining = htmlContentLength - index;
+      size_t chunkSize = (remaining < maxLen) ? remaining : maxLen;
+      
+      // Use a reasonable chunk size (1024 bytes for better performance)
+      // You can adjust this based on your needs
+      if (chunkSize > 1024) {
+          chunkSize = 1024;
+      }
+      // Copy the data to the buffer
+      memcpy(buffer, responsePtr + index, chunkSize);
+      return chunkSize;
+  });
+
+  chunk_response->addHeader(asyncsrv::T_Cache_Control, "public,max-age=60");
+  chunk_response->addHeader(asyncsrv::T_ETag, String(htmlContentLength).c_str());
+  request->send(chunk_response);
 }
 
 void handleNotFound(AsyncWebServerRequest *request)
@@ -1700,7 +1722,11 @@ void handleControl(AsyncWebServerRequest *request)
   }
 
   heatpumpSettings settings = hp.getSettings();
-  settings = change_states(request, settings);
+  if (hpSettingsValid(settings)) {
+      settings = change_states(request, settings);
+  } else {
+      ESP_LOGE(TAG, "handleControl: Invalid Settings");
+  }
 
   String controlPage = FPSTR(control_script_events);
   controlPage = FPSTR(control_script_events);
@@ -2130,8 +2156,8 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
     //ESP_LOGD(TAG, "Settings Mode before: %s", request->arg("MODE").c_str());
     String modeArg = request->arg(F("MODE"));
     if (!modeArg.isEmpty()) {
-      settings.mode = modeArg.c_str();
-	  update = true;
+        settings.mode = modeArg.c_str();
+        update = true;
     }
     //ESP_LOGD(TAG, "Settings Mode after: %s", settings.mode);
 
@@ -2155,8 +2181,8 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
     //ESP_LOGD(TAG, "Settings Fan before: %s", request->arg("FAN").c_str());
     String fanArg = request->arg(F("FAN"));
     if (!fanArg.isEmpty()) {
-      settings.fan = fanArg.c_str();
-	  update = true;
+        settings.fan = fanArg.c_str();
+        update = true;
     }
     //ESP_LOGD(TAG, "Settings Fan after: %s", settings.fan);
   }
@@ -2164,20 +2190,24 @@ heatpumpSettings change_states(AsyncWebServerRequest *request, heatpumpSettings 
   {
     String vaneArg = request->arg(F("VANE"));
     if (!vaneArg.isEmpty()) {
-      settings.vane = vaneArg.c_str();
-	  update = true;
+        settings.vane = vaneArg.c_str();
+        update = true;
     }
   }
   if (request->hasArg(F("WIDEVANE")))
   {
     String wideVaneArg = request->arg(F("WIDEVANE"));
     if (!wideVaneArg.isEmpty()) {
-      settings.wideVane = wideVaneArg.c_str();
-	  update = true;
+        settings.wideVane = wideVaneArg.c_str();
+        update = true;
     }
   }
   if (update)
   {
+    if (!hpSettingsValid(settings)) {
+      ESP_LOGE(TAG, "change_states: Invalid Settings");
+      return settings;
+    }
     hp.setSettings(settings);
     if (hp.getSettings() == hp.getWantedSettings()) // only update it settings change
     {
@@ -2335,7 +2365,10 @@ void hpStatusChanged(heatpumpStatus currentStatus)
 
   // send room temp, operating info and all information
   heatpumpSettings currentSettings = hp.getSettings();
-
+  if (!hpSettingsValid(currentSettings)) {
+    ESP_LOGE(TAG, "hpStatusChanged: Invalid Settings");
+    return;
+  }
   if (currentStatus.roomTemperature == 0)
     return;
 
@@ -4016,4 +4049,33 @@ String getWifiBSSID()
   char wifi_bssid[18];
   snprintf(wifi_bssid, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   return String(wifi_bssid);
+}
+
+bool hpSettingsValid(heatpumpSettings hpSettings){
+  bool result = true;
+  if (hpSettings.power == NULL) {
+    ESP_LOGE(TAG, "Power is NULL");
+    result = false;
+  }
+  if (hpSettings.mode == NULL) {
+    ESP_LOGE(TAG, "Mode is NULL");
+    result = false;
+  }
+  if (hpSettings.temperature == 0) {
+    ESP_LOGE(TAG, "Temperature is 0");
+    result = false;
+  }
+  if (hpSettings.fan == NULL) {
+    ESP_LOGE(TAG, "Fan is NULL");
+    result = false;
+  }
+  if (hpSettings.vane == NULL) {
+    ESP_LOGE(TAG, "Vane is NULL");
+    result = false;
+  }
+  if (hpSettings.wideVane == NULL) {
+    ESP_LOGE(TAG, "Wide Vane is NULL");
+    result = false;
+  }
+  return result;
 }
