@@ -896,11 +896,11 @@ void initOTA()
                    });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
                         {
-                          //    write_log("Progress: %u%%\r", (progress / (total / 100)));
+                         //    write_log("Progress: %lu%%\r", (progress / (total / 100)));
                         });
   ArduinoOTA.onError([](ota_error_t error)
                      {
-      //    write_log("Error[%u]: ", error);
+     //    write_log("Error[%lu]: ", error);
       if (error == OTA_AUTH_ERROR)
       {
         ESP_LOGE(TAG, "Auth Failed");
@@ -3572,21 +3572,21 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 {
   if (type == WS_EVT_CONNECT)
   {
-    ESP_LOGD(TAG, "ws[%s][%u] connect\n", server->url(), client->id());
-    client->printf("Hello Client %u :)", client->id());
+    ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] connect\n", server->url(), client->id());
+    client->printf("Hello Client %" PRIu32 " :)", client->id());
     client->ping();
   }
   else if (type == WS_EVT_DISCONNECT)
   {
-    ESP_LOGD(TAG, "ws[%s][%u] disconnect\n", server->url(), client->id());
+    ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] disconnect\n", server->url(), client->id());
   }
   else if (type == WS_EVT_ERROR)
   {
-    ESP_LOGD(TAG, "ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);
+    ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] error(%u): %s\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);
   }
   else if (type == WS_EVT_PONG)
   {
-    ESP_LOGD(TAG, "ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len) ? (char *)data : "");
+    ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] pong[%zu]: %s\n", server->url(), client->id(), len, (len) ? (char *)data : "");
   }
   else if (type == WS_EVT_DATA)
   {
@@ -3595,7 +3595,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     if (info->final && info->index == 0 && info->len == len)
     {
       // the whole message is in a single frame and we got all of it's data
-      ESP_LOGD(TAG, "ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
+      ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
 
       if (info->opcode == WS_TEXT)
       {
@@ -3640,11 +3640,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       if (info->index == 0)
       {
         if (info->num == 0)
-          ESP_LOGD(TAG, "ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT) ? "text" : "binary");
-        ESP_LOGD(TAG, "ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
+          ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT) ? "text" : "binary");
+        ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] frame[%lu] start[%llu]\n", server->url(), client->id(), info->num, info->len);
       }
 
-      ESP_LOGD(TAG, "ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT) ? "text" : "binary", info->index, info->index + len);
+      ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] frame[%lu] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT) ? "text" : "binary", info->index, info->index + len);
 
       if (info->opcode == WS_TEXT)
       {
@@ -3666,10 +3666,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 
       if ((info->index + len) == info->len)
       {
-        ESP_LOGD(TAG, "ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
+        ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] frame[%lu] end[%llu]\n", server->url(), client->id(), info->num, info->len);
         if (info->final)
         {
-          ESP_LOGD(TAG, "ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT) ? "text" : "binary");
+          ESP_LOGD(TAG, "ws[%s][%" PRIu32 "] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT) ? "text" : "binary");
           // if(info->message_opcode == WS_TEXT)
           //   client->text("I got your text message");
           // else
