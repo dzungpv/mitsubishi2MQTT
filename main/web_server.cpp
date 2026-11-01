@@ -73,6 +73,20 @@ static constexpr uint8_t NUM_LANGUAGES = sizeof(languages) / sizeof(const char *
 static char *html_response = NULL;
 static unsigned int html_resp_length = 0;
 
+// Match every HTTP method on /upload.
+// PlatformIO pulls ESPAsyncWebServer 3.9+, which names the matcher
+// AsyncWebRequestMethod::HTTP_ANY (HTTP_ALL when the IDF HTTP_ANY macro is
+// already defined). The ESP-IDF submodule is 3.8.x and still uses
+// WebRequestMethod::HTTP_ANY.
+#ifdef ASYNCWEBSERVER_WIFI_SUPPORTED
+#ifdef HTTP_ANY
+#define ANY_HTTP_METHOD AsyncWebRequestMethod::HTTP_ALL
+#else
+#define ANY_HTTP_METHOD AsyncWebRequestMethod::HTTP_ANY
+#endif
+#else
+#define ANY_HTTP_METHOD WebRequestMethod::HTTP_ANY
+#endif
 
 static String buildLanguageOptions()
 {
@@ -1312,8 +1326,7 @@ void initCaptivePortal()
   if (!isSecureEnable())
   {
     server.on("/upgrade", handleUpgrade);
-    // Any HTTP method. ESPAsyncWebServer names this matcher AsyncWebRequestMethod::HTTP_ANY.
-    server.on("/upload", AsyncWebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
+    server.on("/upload", ANY_HTTP_METHOD, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
     Update.onProgress(otaUpdateProgress);
 #endif
@@ -1350,8 +1363,7 @@ void startStationWebServer()
   if (!isSecureEnable())
   {
     server.on("/upgrade", handleUpgrade);
-    // Any HTTP method. ESPAsyncWebServer names this matcher AsyncWebRequestMethod::HTTP_ANY.
-    server.on("/upload", AsyncWebRequestMethod::HTTP_ANY, handleUploadDone, handleUploadLoop);
+    server.on("/upload", ANY_HTTP_METHOD, handleUploadDone, handleUploadLoop);
 #ifdef ESP32
     Update.onProgress(otaUpdateProgress);
 #endif
